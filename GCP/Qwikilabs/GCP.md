@@ -32,3 +32,39 @@
    - gcloud
    - Unix CLI
 
+#### Creating a Virtual Machine
+
+- parameters
+
+  - us-central1-f
+  - n1-standard-2
+  - 10 GB Debian 10
+  - Allow HTTP
+
+- SSH connect
+
+- Install Nginx
+
+  ```
+  sudo su -
+  apt-get update
+  apt-get install nginx -y
+  ps auwx | grep nginx
+  ```
+
+- Click  **External IP**  to see the web page
+
+- Create a new instance and connect it with gcloud 
+
+  ```
+  gcloud compute instances create gcelab2 --machine-type n1-standard-2 --zone us-central1-f
+  ```
+
+  ```
+  gcloud compute instances create --help
+  ```
+
+  ```
+  gcloud compute ssh gcelab2 --zone us-central1-f
+  ```
+
