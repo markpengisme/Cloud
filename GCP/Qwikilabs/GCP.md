@@ -1,10 +1,10 @@
-# GCP
 
-## Qwiklabs
 
-### Google Cloud Essentials
+# Qwiklabs
 
-#### A Tour of Qwiklabs and Google Cloud
+## Google Cloud Essentials
+
+### A Tour of Qwiklabs and Google Cloud
 
 1. Google Cloud 7 Services([ref](https://cloud.google.com/docs/overview/cloud-platform-services#top_of_page))
    - Compute
@@ -32,7 +32,7 @@
    - gcloud
    - Unix CLI
 
-#### Creating a Virtual Machine
+### Creating a Virtual Machine
 
 - parameters
 
@@ -66,5 +66,61 @@
 
   ```
   gcloud compute ssh gcelab2 --zone us-central1-f
+  ```
+
+### Getting Started with Cloud Shell and gcloud
+
+- Configure your environment
+
+  -  If you want to attach a persistent disk to a virtual machine instance, both resources must be in the same zone
+  -  Assign a static IP address to an instance, the instance must be in the same region as the static IP address
+  -  default
+
+  ```
+  gcloud config get-value compute/zone
+  gcloud config get-value compute/region
+  gcloud compute project-info describe --project <your_project_ID>
+  ```
+
+- Set environment variables
+
+  ```
+  export PROJECT_ID=<your_project_ID>
+  export ZONE=<your_zone>
+  ```
+
+- Create a virtual machine with the gcloud tool
+
+  ```
+  gcloud compute instances create --help
+  gcloud compute instances create gcelab2 --machine-type n1-standard-2 --zone $ZONE
+  ```
+
+- Explore gcloud commands
+
+  ```
+  gcloud -h
+  gcloud config --help
+  gcloud config list
+  gcloud config list --all
+  gcloud components list
+  ```
+
+- Install a new component
+
+  ```
+  sudo apt-get install google-cloud-sdkgcloud beta interactive
+  ```
+
+- Connect to your VM instance with SSH
+
+  ```
+  gcloud compute ssh gcelab2 --zone $ZONE
+  ```
+
+- Use the Home directory
+
+  ```
+  cd $HOMEvi ./.bashrc
   ```
 
