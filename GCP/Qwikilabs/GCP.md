@@ -124,3 +124,38 @@
   cd $HOMEvi ./.bashrc
   ```
 
+### Kubernetes Engine: Qwik Start
+
+- Set a default compute zone
+
+  ```
+  gcloud config set compute/zone us-central1-a
+  ```
+
+- Create a GKE cluster(A [cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-architecture) consists of at least one **cluster master** machine and multiple worker machines called **nodes**.)
+
+  ```
+  gcloud container clusters create my-cluster
+  ```
+
+- Get authentication credentials for the cluster
+
+  ```
+  gcloud container clusters get-credentials my-cluster
+  ```
+
+- Deploy an application to the cluster
+
+  - GKE uses Kubernetes objects to create and manage your cluster's resources. Kubernetes provides the [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) object for deploying stateless applications like web servers. [Service](https://kubernetes.io/docs/concepts/services-networking/service/) objects define rules and load balancing for accessing your application from the internet.
+
+  ```
+  kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:1.0kubectl expose deployment hello-server --type=LoadBalancer --port 8080kubectl get service
+  ```
+
+  - View the app - http://[EXTERNAL-IP]:8080
+
+- Deleting the cluster
+
+  ```
+  gcloud container clusters delete my-cluster
+  ```
