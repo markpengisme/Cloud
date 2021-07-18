@@ -298,4 +298,119 @@
   - http://[LOAD_BALANCER_IP_ADDRESS]/
   - Your browser should render a page with content showing the name of the instance that served the page, along with its zone 
 
-- - 
+## Build a Website on Google Cloud
+
+### Deploy Your Website on Cloud Run
+
+- Activate Cloud Shell
+
+  ```
+  gcloud auth list
+  gcloud config list project
+  ```
+
+- Clone Source Repository
+
+  - clone > start > Preview on port 8080
+
+  ```
+  git clone https://github.com/googlecodelabs/monolith-to-microservices.git
+  cd ~/monolith-to-microservices
+  ./setup.sh
+  
+  cd ~/monolith-to-microservices/monolith
+  npm start
+  ```
+
+- Create Docker Container with Cloud Build
+
+  - build > submit > view[`Navigation > Cloud Build > History`]
+
+  ```
+  gcloud services enable cloudbuild.googleapis.com
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 .
+  ```
+
+- Deploy Container To Cloud Run
+
+  - There are two approaches for deploying to Cloud Run:
+
+    - Managed Cloud Run(this lab)
+
+    - Cloud Run on GKE([ref](https://cloud.google.com/run/docs/gke/setup))
+
+  ```
+  gcloud services enable run.googleapis.com
+  gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed
+  ```
+
+- Verify deployment
+
+  - `gcloud run services list`
+  - OR
+  - [`Navigation > Cloud Run`]
+
+- Create new revision with lower concurrency(default is 80)
+
+  ```
+  gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed --concurrency 1
+  ```
+
+  - [`Navigation > Cloud Run > monolith > Revisions > monolith-00002`] Concurrency=1
+
+  ```
+  gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed --concurrency 80
+  ```
+
+- Make Changes To The Website
+
+  ```sh
+  ## update
+  cd ~/monolith-to-microservices/react-app/src/pages/Home
+  mv index.js.new index.js
+  cat ~/monolith-to-microservices/react-app/src/pages/Home/index.js
+  cd ~/monolith-to-microservices/react-app
+  
+  ## build react app
+  npm run build:monolith
+  cd ~/monolith-to-microservices/monolith
+  npm start
+  
+  ## build & submit docker image
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 .
+  ```
+
+- Update website with zero downtime
+
+  ```
+  gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 --platform managed
+  ```
+
+- Verify Deployment
+
+  ```SH
+  gcloud run services describe monolith --platform managed
+  
+  ## see IP
+  gcloud beta run services list
+  ```
+
+- Cleanup
+
+  ```sh
+  # Delete the container image for version 1.0.0 of our monolith
+  gcloud container images delete gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --quiet
+  
+  # Delete the container image for version 2.0.0 of our monolith
+  gcloud container images delete gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 --quiet
+  
+  # The following command will take all source archives from all builds and delete them from cloud storage
+  gcloud builds list | awk 'NR > 1 {print $4}' | while read line; do gsutil rm $line; done
+  
+  # Delete Cloud Run service(choose region)
+  gcloud beta run services delete monolith --platform managed
+  
+  # Check
+  gcloud beta run services list
+  ```
+
