@@ -1,6 +1,6 @@
-
-
 # Qwiklabs
+
+[toc]
 
 ## Google Cloud Essentials
 
@@ -45,7 +45,7 @@
 
 - Install Nginx
 
-  ```
+  ```sh
   sudo su -
   apt-get update
   apt-get install nginx -y
@@ -54,17 +54,17 @@
 
 - Click  **External IP**  to see the web page
 
-- Create a new instance and connect it with gcloud 
+- Create a new instance and connect it with gcloud
 
-  ```
+  ```sh
   gcloud compute instances create gcelab2 --machine-type n1-standard-2 --zone us-central1-f
   ```
 
-  ```
+  ```sh
   gcloud compute instances create --help
   ```
 
-  ```
+  ```sh
   gcloud compute ssh gcelab2 --zone us-central1-f
   ```
 
@@ -72,11 +72,11 @@
 
 - Configure your environment
 
-  -  If you want to attach a persistent disk to a virtual machine instance, both resources must be in the same zone
-  -  Assign a static IP address to an instance, the instance must be in the same region as the static IP address
-  -  default
+  - If you want to attach a persistent disk to a virtual machine instance, both resources must be in the same zone
+  - Assign a static IP address to an instance, the instance must be in the same region as the static IP address
+  - default
 
-  ```
+  ```sh
   gcloud config get-value compute/zone
   gcloud config get-value compute/region
   gcloud compute project-info describe --project <your_project_ID>
@@ -84,21 +84,21 @@
 
 - Set environment variables
 
-  ```
+  ```sh
   export PROJECT_ID=<your_project_ID>
   export ZONE=<your_zone>
   ```
 
 - Create a virtual machine with the gcloud tool
 
-  ```
+  ```sh
   gcloud compute instances create --help
   gcloud compute instances create gcelab2 --machine-type n1-standard-2 --zone $ZONE
   ```
 
 - Explore gcloud commands
 
-  ```
+  ```sh
   gcloud -h
   gcloud config --help
   gcloud config list
@@ -108,39 +108,41 @@
 
 - Install a new component
 
-  ```
-  sudo apt-get install google-cloud-sdkgcloud beta interactive
+  ```sh
+  sudo apt-get install google-cloud-sdk
+  gcloud beta interactive
   ```
 
 - Connect to your VM instance with SSH
 
-  ```
+  ```sh
   gcloud compute ssh gcelab2 --zone $ZONE
   ```
 
 - Use the Home directory
 
-  ```
-  cd $HOMEvi ./.bashrc
+  ```sh
+  cd $HOME
+  vi ./.bashrc
   ```
 
 ### Kubernetes Engine: Qwik Start
 
 - Set a default compute zone
 
-  ```
+  ```sh
   gcloud config set compute/zone us-central1-a
   ```
 
 - Create a GKE cluster(A [cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-architecture) consists of at least one **cluster master** machine and multiple worker machines called **nodes**.)
 
-  ```
+  ```sh
   gcloud container clusters create my-cluster
   ```
 
 - Get authentication credentials for the cluster
 
-  ```
+  ```sh
   gcloud container clusters get-credentials my-cluster
   ```
 
@@ -148,15 +150,17 @@
 
   - GKE uses Kubernetes objects to create and manage your cluster's resources. Kubernetes provides the [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) object for deploying stateless applications like web servers. [Service](https://kubernetes.io/docs/concepts/services-networking/service/) objects define rules and load balancing for accessing your application from the internet.
 
-  ```
-  kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:1.0kubectl expose deployment hello-server --type=LoadBalancer --port 8080kubectl get service
+  ```sh
+  kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:1.0
+  kubectl expose deployment hello-server --type=LoadBalancer --port 8080
+  kubectl get service
   ```
 
-  - View the app - http://[EXTERNAL-IP]:8080
+  - View the app - `http://[EXTERNAL-IP]:8080`
 
 - Deleting the cluster
 
-  ```
+  ```sh
   gcloud container clusters delete my-cluster
   ```
 
@@ -166,62 +170,103 @@
 
 - Set the default region and zone for all resources
 
-  ```
-  gcloud config set compute/zone us-central1-agcloud config set compute/region us-central1
+  ```sh
+  gcloud config set compute/zone us-central1-a
+  gcloud config set compute/region us-central1
   ```
 
 - Create multiple web server instances
 
-  ```
-  gcloud compute instances create www1 \  --image-family debian-9 \  --image-project debian-cloud \  --zone us-central1-a \  --tags network-lb-tag \  --metadata startup-script="#! /bin/bash    sudo apt-get update    sudo apt-get install apache2 -y    sudo service apache2 restart    echo '<!doctype html><html><body><h1>www1</h1></body></html>' | tee /var/www/html/index.html"gcloud compute instances create www2 \  --image-family debian-9 \  --image-project debian-cloud \  --zone us-central1-a \  --tags network-lb-tag \  --metadata startup-script="#! /bin/bash    sudo apt-get update    sudo apt-get install apache2 -y    sudo service apache2 restart    echo '<!doctype html><html><body><h1>www2</h1></body></html>' | tee /var/www/html/index.html"gcloud compute instances create www3 \  --image-family debian-9 \  --image-project debian-cloud \  --zone us-central1-a \  --tags network-lb-tag \  --metadata startup-script="#! /bin/bash    sudo apt-get update    sudo apt-get install apache2 -y    sudo service apache2 restart    echo '<!doctype html><html><body><h1>www3</h1></body></html>' | tee /var/www/html/index.html"
+  ```sh
+  gcloud compute instances create www1 \
+    --image-family debian-9 \
+    --image-project debian-cloud \
+    --zone us-central1-a \
+    --tags network-lb-tag \
+    --metadata startup-script="#! /bin/bash
+      sudo apt-get update
+      sudo apt-get install apache2 -y
+      sudo service apache2 restart
+      echo '<!doctype html><html><body><h1>www1</h1></body></html>' | tee /var/www/html/index.html"
+  
+  gcloud compute instances create www2 \
+    --image-family debian-9 \
+    --image-project debian-cloud \
+    --zone us-central1-a \
+    --tags network-lb-tag \
+    --metadata startup-script="#! /bin/bash
+      sudo apt-get update
+      sudo apt-get install apache2 -y
+      sudo service apache2 restart
+      echo '<!doctype html><html><body><h1>www2</h1></body></html>' | tee /var/www/html/index.html"
+      
+  gcloud compute instances create www3 \
+    --image-family debian-9 \
+    --image-project debian-cloud \
+    --zone us-central1-a \
+    --tags network-lb-tag \
+    --metadata startup-script="#! /bin/bash
+      sudo apt-get update
+      sudo apt-get install apache2 -y
+      sudo service apache2 restart
+      echo '<!doctype html><html><body><h1>www3</h1></body></html>' | tee /var/www/html/index.html"
   ```
 
 - Create a firewall rule to allow external traffic to the VM instances
 
-  ```
+  ```sh
   gcloud compute firewall-rules create www-firewall-network-lb \    --target-tags network-lb-tag --allow tcp:80
   ```
 
 - Verify each instance is running with curl
 
-  ```
-  gcloud compute instances listcurl http://[IP_ADDRESS]
+  ```sh
+  gcloud compute instances list
+  curl http://[IP_ADDRESS]
   ```
 
 - Create a static external IP address for your load balancer
 
-  ```
-  gcloud compute addresses create network-lb-ip-1 \ --region us-central1
+  ```sh
+  gcloud compute addresses create network-lb-ip-1 \
+      --region us-central1
   ```
 
 - Add a legacy HTTP health check resource
 
-  ```
+  ```sh
   gcloud compute http-health-checks create basic-check
   ```
 
 - Create the target pool(in same region) and use the health check, which is required for the service to function
 
-  ```
-  gcloud compute target-pools create www-pool \    --region us-central1 --http-health-check basic-check
+  ```sh
+  gcloud compute target-pools create www-pool \
+      --region us-central1 --http-health-check basic-check
   ```
 
 - Add the instances to the pool:
 
-  ```
-  gcloud compute target-pools add-instances www-pool \    --instances www1,www2,www3
+  ```sh
+  gcloud compute target-pools add-instances www-pool \
+      --instances www1,www2,www3
   ```
 
 - Add a forwarding rule
 
-  ```
-  gcloud compute forwarding-rules create www-rule \    --region us-central1 \    --ports 80 \    --address network-lb-ip-1 \    --target-pool www-pool
+  ```sh
+  gcloud compute forwarding-rules create www-rule \
+      --region us-central1 \
+      --ports 80 \
+      --address network-lb-ip-1 \
+      --target-pool www-pool
   ```
 
 - Sending traffic to your instances
 
-  ```
-  gcloud compute forwarding-rules describe www-rule --region us-central1while true; do curl -m1 [IP_ADDRESS]; done
+  ```sh
+  gcloud compute forwarding-rules describe www-rule --region us-central1
+  while true; do curl -m1 [IP_ADDRESS]; done
   ```
 
   ---
@@ -233,70 +278,111 @@
 
 - Create the load balancer template
 
-  ```
-  gcloud compute instance-templates create lb-backend-template \   --region=us-central1 \   --network=default \   --subnet=default \   --tags=allow-health-check \   --image-family=debian-9 \   --image-project=debian-cloud \   --metadata=startup-script='#! /bin/bash     apt-get update     apt-get install apache2 -y     a2ensite default-ssl     a2enmod ssl     vm_hostname="$(curl -H "Metadata-Flavor:Google" \     http://169.254.169.254/computeMetadata/v1/instance/name)"     echo "Page served from: $vm_hostname" | \     tee /var/www/html/index.html     systemctl restart apache2'
+  ```sh
+  gcloud compute instance-templates create lb-backend-template \
+     --region=us-central1 \
+     --network=default \
+     --subnet=default \
+     --tags=allow-health-check \
+     --image-family=debian-9 \
+     --image-project=debian-cloud \
+     --metadata=startup-script='#! /bin/bash
+       apt-get update
+       apt-get install apache2 -y
+       a2ensite default-ssl
+       a2enmod ssl
+       vm_hostname="$(curl -H "Metadata-Flavor:Google" \
+       http://169.254.169.254/computeMetadata/v1/instance/name)"
+       echo "Page served from: $vm_hostname" | \
+       tee /var/www/html/index.html
+       systemctl restart apache2'
   ```
 
 - Create a managed instance group based on the template
 
-  ```
-  gcloud compute instance-groups managed create lb-backend-group \   --template=lb-backend-template --size=2 --zone=us-central1-a
+  ```sh
+  gcloud compute instance-groups managed create lb-backend-group \
+      --template=lb-backend-template --size=2 --zone=us-central1-a
   ```
 
 - Create the `fw-allow-health-check` firewall rule.
 
-  ```
-  gcloud compute firewall-rules create fw-allow-health-check \    --network=default \    --action=allow \    --direction=ingress \    --source-ranges=130.211.0.0/22,35.191.0.0/16 \    --target-tags=allow-health-check \    --rules=tcp:80
+  ```sh
+  gcloud compute firewall-rules create fw-allow-health-check \
+      --network=default \
+      --action=allow \
+      --direction=ingress \
+      --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+      --target-tags=allow-health-check \
+      --rules=tcp:80
   ```
 
 - Set up a global static external IP address
 
-  ```
-  gcloud compute addresses create lb-ipv4-1 \    --ip-version=IPV4 \    --globalgcloud compute addresses describe lb-ipv4-1 \    --format="get(address)" \    --global
+  ```sh
+  gcloud compute addresses create lb-ipv4-1 \
+      --ip-version=IPV4 \
+      --globalgcloud compute addresses describe lb-ipv4-1 \
+      --format="get(address)" \
+      --global
   ```
 
 - Create a healthcheck for the load balancer
 
-  ```
-  gcloud compute health-checks create http http-basic-check \	--port 80
+  ```sh
+  gcloud compute health-checks create http http-basic-check \
+      --port 80
   ```
 
 - Create a backend service
 
-  ```
-  gcloud compute backend-services create web-backend-service \    --protocol=HTTP \    --port-name=http \    --health-checks=http-basic-check \    --global
+  ```sh
+  gcloud compute backend-services create web-backend-service \
+      --protocol=HTTP \
+      --port-name=http \
+      --health-checks=http-basic-check \
+      --global
   ```
 
 - Add your instance group as the backend to the backend service:
 
-  ```
-  gcloud compute backend-services add-backend web-backend-service \    --instance-group=lb-backend-group \    --instance-group-zone=us-central1-a \    --global
+  ```sh
+  gcloud compute backend-services add-backend web-backend-service \
+      --instance-group=lb-backend-group \
+      --instance-group-zone=us-central1-a \
+      --global
   ```
 
 - Create a URL map to route the incoming requests to the default backend service
 
-  ```
-  gcloud compute url-maps create web-map-http \	--default-service web-backend-service
+  ```sh
+  gcloud compute url-maps create web-map-http \
+      --default-service web-backend-service
   ```
 
 - Create a target HTTP proxy to route requests to your URL map
 
-  ```
-   gcloud compute target-http-proxies create http-lb-proxy \	--url-map web-map-http
+  ```sh
+   gcloud compute target-http-proxies create http-lb-proxy \
+      --url-map web-map-http
   ```
 
 - Create a global forwarding rule to route incoming requests to the proxy
 
-  ```
-  gcloud compute forwarding-rules create http-content-rule \    --address=lb-ipv4-1\    --global \    --target-http-proxy=http-lb-proxy \    --ports=80
+  ```sh
+  gcloud compute forwarding-rules create http-content-rule \
+      --address=lb-ipv4-1\
+      --global \
+      --target-http-proxy=http-lb-proxy \
+      --ports=80
   ```
 
 - Testing traffic sent to your instances
 
-  - **Network services** > **Load balancing **>**web-map-http**>
+  - **Network services** > **Load balancing** > **web-map-http** >
   - Backend > Status = Ready
-  - http://[LOAD_BALANCER_IP_ADDRESS]/
-  - Your browser should render a page with content showing the name of the instance that served the page, along with its zone 
+  - `http://[LOAD_BALANCER_IP_ADDRESS]/`
+  - Your browser should render a page with content showing the name of the instance that served the page, along with its zone
 
 ## Build a Website on Google Cloud
 
@@ -304,7 +390,7 @@
 
 - Activate Cloud Shell
 
-  ```
+  ```sh
   gcloud auth list
   gcloud config list project
   ```
@@ -313,7 +399,7 @@
 
   - clone > start > Preview on port 8080
 
-  ```
+  ```sh
   git clone https://github.com/googlecodelabs/monolith-to-microservices.git
   cd ~/monolith-to-microservices
   ./setup.sh
@@ -326,7 +412,7 @@
 
   - build > submit > view[`Navigation > Cloud Build > History`]
 
-  ```
+  ```sh
   gcloud services enable cloudbuild.googleapis.com
   gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 .
   ```
@@ -339,7 +425,7 @@
 
     - Cloud Run on GKE([ref](https://cloud.google.com/run/docs/gke/setup))
 
-  ```
+  ```sh
   gcloud services enable run.googleapis.com
   gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed
   ```
@@ -352,13 +438,13 @@
 
 - Create new revision with lower concurrency(default is 80)
 
-  ```
+  ```sh
   gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed --concurrency 1
   ```
 
   - [`Navigation > Cloud Run > monolith > Revisions > monolith-00002`] Concurrency=1
 
-  ```
+  ```sh
   gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --platform managed --concurrency 80
   ```
 
@@ -382,7 +468,7 @@
 
 - Update website with zero downtime
 
-  ```
+  ```sh
   gcloud run deploy --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 --platform managed
   ```
 
@@ -420,24 +506,24 @@
 
 - Environment Setup
 
-  ```
+  ```sh
   gcloud auth list
   gcloud config list project
   gcloud config set compute/zone us-central1-f
   gcloud services enable compute.googleapis.com
   ```
 
--  Create Cloud Storage bucket
+- Create Cloud Storage bucket
 
   - `$DEVSHELL_PROJECT_ID`: help for unique
 
-  ```
+  ```sh
   gsutil mb gs://fancy-store-$DEVSHELL_PROJECT_ID
   ```
 
 - Clone source repository
 
-  ```
+  ```sh
   git clone https://github.com/googlecodelabs/monolith-to-microservices.git
   cd ~/monolith-to-microservices
   ./setup.sh
@@ -452,14 +538,13 @@
 
   1. Create Startup Script
 
-     - **Open Editor** > **File** > **New File **>`monolith-to-microservices/startup-script.sh`
+     - **Open Editor** > **File** > **New File** > `monolith-to-microservices/startup-script.sh`
      - command+option+shift+v = paste & match style
      - replace  [DEVSHELL_PROJECT_ID] to yours
      - check  "End of Line Sequence" is set to "LF"
 
      ```sh
      #!/bin/bash
-     
      
      # Install logging monitor. The monitor will automatically pick up logs sent to
      # syslog.
@@ -505,60 +590,60 @@
      supervisorctl update
      ```
 
-     ```
+     ```sh
      gsutil cp ~/monolith-to-microservices/startup-script.sh gs://fancy-store-$DEVSHELL_PROJECT_ID
      ```
 
      - It will now be accessible at: `https://storage.googleapis.com/[BUCKET_NAME]/startup-script.sh`.
 
   2. Copy code into Cloud Storage bucket
-
-     ```
+  
+     ```sh
      cd ~
      rm -rf monolith-to-microservices/*/node_modules
      gsutil -m cp -r monolith-to-microservices gs://fancy-store-$DEVSHELL_PROJECT_ID/
      ```
-
+  
   3. Deploy backend instance
-
-     ```
+  
+     ```sh
      gcloud compute instances create backend \
          --machine-type=n1-standard-1 \
          --tags=backend \
         --metadata=startup-script-url=https://storage.googleapis.com/fancy-store-$DEVSHELL_PROJECT_ID/startup-script.sh
      ```
-
+  
   4. Configure connection to backend
-
+  
      - `gcloud compute instances list` > Copy the External IP
-
+  
      - **Open Editor** > **File** >**View** > **Toggle Hidden Files**
-
+  
      - `monolith-to-microservices/react-app/.env` replace localhost to External IP
-
+  
      - Rebuild react-app > copt to bucket
-
-       ```
+  
+       ```sh
        cd ~/monolith-to-microservices/react-app
        npm install && npm run-script build
        cd ~
        rm -rf monolith-to-microservices/*/node_modules
        gsutil -m cp -r monolith-to-microservices gs://fancy-store-$DEVSHELL_PROJECT_ID/
        ```
-
+  
   5. Deploy frontend instance
-
-     ```
+  
+     ```sh
      gcloud compute instances create frontend \
          --machine-type=n1-standard-1 \
          --tags=frontend \
          --metadata=startup-script-url=https://storage.googleapis.com/fancy-store-$DEVSHELL_PROJECT_ID/startup-script.sh
      ```
-
+  
      > all microservices run on both the frontend and backend in this sample
-
+  
   6. Configure Network
-
+  
      ```sh
      gcloud compute firewall-rules create fw-fe \
          --allow tcp:8080 \
@@ -571,18 +656,18 @@
      ## use `gcloud compute instances list` to replace frontend external ip
      watch -n 2 curl http://[FRONTEND_ADDRESS]:8080
      ```
-
+  
      - open browser to `http://[FRONTEND_ADDRESS]:8080`
-
+  
 - Create Managed Instance Groups(MIG)
 
   - To allow the application to scale
-  - manage as a single entity in a single zone. 
+  - manage as a single entity in a single zone.
   - provide autohealing, load balancing, autoscaling, and rolling updates
 
   - Create Instance Template from Source Instance
 
-    ```
+    ```sh
     gcloud compute instances stop frontend
     gcloud compute instances stop backend
     
@@ -599,7 +684,7 @@
 
   - Create managed instance group
 
-    ```
+    ```sh
     gcloud compute instance-groups managed create fancy-fe-mig \
         --base-instance-name fancy-fe \
         --size 2 \
@@ -722,14 +807,14 @@
 
 - Update Configuration(backend IP)
 
-  ```
+  ```sh
   cd ~/monolith-to-microservices/react-app/
   gcloud compute forwarding-rules list --global
   ```
 
   - `monolith-to-microservices/react-app/.env` replace to load balancer external IP
 
-  ```
+  ```sh
   cd ~/monolith-to-microservices/react-app
   npm install && npm run-script build
   
@@ -740,7 +825,7 @@
 
 - Update the frontend instances by rolling restart command
 
-  ```
+  ```sh
   gcloud compute instance-groups managed rolling-action replace fancy-fe-mig --max-unavailable 100%
   ```
 
@@ -752,11 +837,11 @@
   watch -n 2 gcloud compute backend-services get-health fancy-fe-frontend --global
   ```
 
-- Scaling Compute Engine 
+- Scaling Compute Engine
 
-  - Automatically Resize by Utilization(`>60`->add;` <60`->remove)
+  - Automatically Resize by Utilization(`>60`->add; `<60`->remove)
 
-    ```
+    ```sh
     gcloud compute instance-groups managed set-autoscaling \
       fancy-fe-mig \
       --max-num-replicas 2 \
@@ -769,7 +854,7 @@
 
   - Enable Content Delivery Network to provide caching for the frontend.(GFE provide)
 
-    ```
+    ```sh
     gcloud compute backend-services update fancy-fe-frontend \
         --enable-cdn --global
     ```
@@ -823,7 +908,7 @@
     gcloud compute forwarding-rules list --global
     ```
 
-    - http://[LB_IP]
+    - `http://[LB_IP]`
 
   - Simulate Failure: In order to confirm the health check works, log in to an instance and stop the services.
 
@@ -838,5 +923,136 @@
     --filter='operationType~compute.instances.repair.*'
     ```
 
-    
+### Deploy, Scale, and Update Your Website on Google Kubernetes Engine
 
+:star:
+
+- Create a GKE cluster
+
+  ```sh
+  gcloud config set compute/zone us-central1-f
+  gcloud services enable container.googleapis.com
+  gcloud container clusters create fancy-cluster --num-nodes 3
+  gcloud compute instances list
+  ```
+
+  - **Navigation menu** > **Kubernetes Engine** > **Clusters**
+
+- Clone source repository
+
+  ```sh
+  cd ~
+  git clone https://github.com/googlecodelabs/monolith-to-microservices.git
+  cd ~/monolith-to-microservices
+  ./setup.sh
+  cd ~/monolith-to-microservices/monolith
+  npm start
+  ```
+
+- Create Docker container with Cloud Build
+
+  - single cmd to do build and submit
+
+  ```sh
+  gcloud services enable cloudbuild.googleapis.com
+  cd ~/monolith-to-microservices/monolith
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 .
+  ```
+
+- Deploy container to GKE
+
+  - Kubernetes represents applications as [Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/), which are units that represent a container
+  - The Pod is the smallest deployable unit in Kubernetes.
+  - To deploy your application, create a [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) resource. The Deployment manages multiple copies of your application, called replicas, and schedules them to run on the individual nodes in your cluster.
+  - Deployments ensure this by creating a [ReplicaSet](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/). The ReplicaSet is responsible for making sure the number of replicas specified are always running.
+
+  ```sh
+  kubectl create deployment monolith --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0
+  kubectl get all
+  kubectl get pods
+  kubectl get deploy
+  kubectl get svc
+  kubectl get rs
+  
+  #You can also combine the kubectl get pods,deployments
+  ## debug
+  kubectl describe pod monolith
+  kubectl describe pod/monolith-787c4bbb5d-4zk66
+  kubectl describe deployment monolith
+  kubectl describe deployment.apps/monolith
+  ```
+
+  - **Navigation menu** > **Kubernetes Engine** > **Workloads**.
+  - To see the full benefit of Kubernetes, simulate a server crash by deleting a pod and see what happens
+
+  ```sh
+  kubectl get pods
+  kubectl delete pod/<POD_NAME> &
+  kubectl get all
+  ```
+
+  - The ReplicaSet saw that the pod was terminating and triggered a new pod to keep up the desired replica count
+
+- Expose GKE Deployment
+
+  - You must explicitly expose your application to traffic from the Internet via a [Service](https://kubernetes.io/docs/concepts/services-networking/service/) resource. A Service provides networking and IP support to your application's Pods. GKE creates an external IP and a Load Balancer for your application.
+
+  ```sh
+  kubectl expose deployment monolith --type=LoadBalancer --port 80 --target-port 8080
+  kubectl get service
+  ```
+
+- Scale GKE deployment up to 3 replicas
+
+  ```sh
+  kubectl scale deployment monolith --replicas=3
+  kubectl get all
+  ```
+
+- Make changes to the website
+
+  - **Scenario:** Your marketing team has asked you to change the homepage for your site. They think it should be more informative of who your company is and what you actually sell.
+
+  ```sh
+  ## update
+  cd ~/monolith-to-microservices/react-app/src/pages/Home
+  mv index.js.new index.js
+  cd ~/monolith-to-microservices/react-app
+  npm run build:monolith
+  cd ~/monolith-to-microservices/monolith
+  
+  ## new cloud build
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 .
+  ```
+
+- Update website with zero downtime
+
+  - GKE's rolling update mechanism ensures that your application remains up and available even as the system replaces instances of your old container image with your new one across all the running replicas.
+
+  ```sh
+  ## update image
+  kubectl set image deployment/monolith monolith=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0
+  ## You will see 3 new pods being created and your old pods getting shut down
+  kubectl get pods
+  ```
+
+- Cleanup
+
+  ```sh
+  ## delete repo
+  cd ~rm -rf monolith-to-microservices
+  
+  ## delete container images
+  gcloud container images delete gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:1.0.0 --quiet
+  gcloud container images delete gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 --quiet
+  
+  ## take all source archives from all builds and delete them from cloud storage
+  gcloud builds list | awk 'NR > 1 {print $4}' | while read line; do gsutil rm $line; done
+  
+  ## delete gke service
+  kubectl delete service monolith
+  kubectl delete deployment monolith
+  
+  ## delete gke cluster
+  gcloud container clusters delete fancy-cluster
+  ```
