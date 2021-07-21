@@ -1,5 +1,7 @@
 # Build a Website on Google Cloud
 
+[toc]
+
 ## Deploy Your Website on Cloud Run
 
 - Activate Cloud Shell
@@ -817,3 +819,84 @@
     ```
 
   - Test Your Work by: `http://<Frontend_IP_ADDRESS>`
+
+## Build a Website on Google Cloud: Challenge Lab
+
+- Challenge lab scenario: You have just started a new role at FancyStore, Inc. Your task is to take the company's existing monolithic e-commerce website and break it into a series of logically separated microservices. The existing monolith code is sitting in a GitHub repo, and you will be expected to containerize this app and then refactor it.
+
+- **Task 1: Download the monolith code and build your container**
+
+  ```sh
+  cd ~
+  git clone https://github.com/googlecodelabs/monolith-to-microservices.git
+  cd ~/monolith-to-microservices
+  ./setup.sh
+  cd ~/monolith-to-microservices/monolith
+  npm start
+  gcloud services enable cloudbuild.googleapis.com
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/fancytest:1.0.0 .
+  ```
+
+- **Task 2: Create a kubernetes cluster and deploy the application**
+
+  ```sh
+  gcloud config set compute/zone us-central1-a
+  gcloud services enable container.googleapis.com
+  gcloud container clusters create fancy-cluster --num-nodes 3
+  gcloud compute instances list
+  kubectl create deployment fancytest --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/fancytest:1.0.0
+  kubectl expose deployment fancytest --type=LoadBalancer --port 80 --target-port 8080
+  kubectl get all
+  ```
+
+- **Task 3: Create a containerized version of your Microservices**
+
+  ```sh
+  cd ~/monolith-to-microservices/microservices/src/orders
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/orders:1.0.0 .
+  cd ~/monolith-to-microservices/microservices/src/products
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/products:1.0.0 .
+  ```
+
+- **Task 4: Deploy the new microservices**
+
+  ```sh
+  kubectl create deployment orders --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/orders:1.0.0
+  kubectl expose deployment orders --type=LoadBalancer --port 80 --target-port 8081
+  kubectl create deployment products --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/products:1.0.0
+  kubectl expose deployment products --type=LoadBalancer --port 80 --target-port 8082
+  kubectl get all
+  ```
+
+- **Task 5: Configure the Frontend microservice**
+
+  ```sh
+  cd ~/monolith-to-microservices/react-app
+  vim .env
+  ```
+
+  ```sh
+  REACT_APP_ORDERS_URL=http://<ORDERS_IP_ADDRESS>/api/orders
+  REACT_APP_PRODUCTS_URL=http://<PRODUCTS_IP_ADDRESS>/api/products
+  ```
+
+  ```sh
+  npm run build
+  ```
+
+- **Task 6: Create a containerized version of the Frontend microservice**
+
+  ```sh
+  cd ~/monolith-to-microservices/microservices/src/frontend
+  gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/frontend:1.0.0 .
+  ```
+
+- **Task 7: Deploy the Frontend microservice**
+
+  ```sh
+  kubectl create deployment frontend --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/frontend:1.0.0
+  kubectl expose deployment frontend --type=LoadBalancer --port 80 --target-port 8080
+  kubectl get all
+  ```
+
+  - `http://<Frontend_IP_ADDRESS>`

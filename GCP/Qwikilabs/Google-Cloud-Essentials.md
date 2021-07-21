@@ -1,5 +1,7 @@
 # Google Cloud Essentials
 
+[toc]
+
 ## A Tour of Qwiklabs and Google Cloud
 
 1. Google Cloud 7 Services([ref](https://cloud.google.com/docs/overview/cloud-platform-services#top_of_page))
