@@ -1,5 +1,7 @@
 # Qwiklabs
 
+> This document is [qwiklabs](https://www.qwiklabs.com) note
+
 [toc]
 
 ## Google Cloud Essentials
@@ -1056,3 +1058,150 @@
   ## delete gke cluster
   gcloud container clusters delete fancy-cluster
   ```
+
+### Migrating a Monolithic Website to Microservices on Google Kubernetes Engine
+
+:star::star::star:
+
+- Environment Setup > Clone Source Repository > Create a GKE Cluster
+
+  ```sh
+  gcloud config set compute/zone us-central1-f
+  cd ~
+  git clone https://github.com/googlecodelabs/monolith-to-microservices.git
+  cd ~/monolith-to-microservices
+  ./setup.sh
+  gcloud services enable container.googleapis.com
+  gcloud container clusters create fancy-cluster --num-nodes 3
+  gcloud compute instances list
+  ```
+
+- Deploy Existing Monolith
+
+  ```sh
+  cd ~/monolith-to-microservices
+  ./deploy-monolith.sh
+  kubectl get service monolith
+  ```
+
+  - `http://[EXTERNAL-IP]`
+
+- Migrate monolith to a microservice([ref](https://cloud.google.com/architecture/migrating-a-monolithic-app-to-microservices-gke#best_practices_for_microservices))
+
+  - Now that you have a monolith website running on GKE, start breaking each service into a microservice.
+
+  - Typically, a planning effort should take place to determine which services to break into smaller chunks, usually around specific parts of the application like business domain.
+
+  - For this lab you will create an example and break out each service around the business domain: Orders, Products, and Frontend
+
+  - Create new orders microservice
+
+    ```sh
+    ## cloud build
+    cd ~/monolith-to-microservices/microservices/src/orders
+    gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/orders:1.0.0 .
+    
+    # Navigation Menu > Cloud Build > History > Build ID
+    ## deploy container to GKE
+    kubectl create deployment orders --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/orders:1.0.0
+    kubectl get all
+    
+    # Navigation menu > Kubernetes Engine > Workloads
+    ## expose GKE container
+    kubectl expose deployment orders --type=LoadBalancer --port 80 --target-port 8081
+    kubectl get service orders
+    ```
+
+  - Reconfigure Monolith
+
+    ```sh
+    cd ~/monolith-to-microservices/react-app
+    vim .env.monolith
+    ```
+
+    ```sh
+    REACT_APP_ORDERS_URL=http://<ORDERS_IP_ADDRESS>/api/orders
+    REACT_APP_PRODUCTS_URL=/service/products
+    ```
+
+    - test: `http://<ORDERS_IP_ADDRESS>/api/orders`
+
+    ```sh
+    ## rebuild
+    npm run build:monolith
+    
+    ## cloud build
+    cd ~/monolith-to-microservices/monolithgcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0 .
+    
+    ## redeploy container to GKE by update image
+    kubectl set image deployment/monolith monolith=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:2.0.0
+    ```
+
+    - verify: `http://<MONOLITH_IP_ADDRESS>/orders`
+
+  - Migrate Products to Microservice
+
+    ```sh
+    ## cloud build
+    cd ~/monolith-to-microservices/microservices/src/products
+    gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/products:1.0.0 .
+    
+    ## deploy container to GKE
+    kubectl create deployment products --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/products:1.0.0
+    ## expose GKE container
+    kubectl expose deployment products --type=LoadBalancer --port 80 --target-port 8082
+    kubectl get service products
+    ```
+
+    ```sh
+    cd ~/monolith-to-microservices/react-app
+    vim .env.monolith
+    ```
+
+    ```sh
+    REACT_APP_ORDERS_URL=http://<ORDERS_IP_ADDRESS>/api/orders
+    REACT_APP_PRODUCTS_URL=http://<PRODUCTS_IP_ADDRESS>/api/products
+    ```
+
+    - test: `http://<PRODUCTS_IP_ADDRESS>/api/products`
+
+    ```sh
+    ## rebuild
+    npm run build:monolith
+    
+    ## cloud build
+    cd ~/monolith-to-microservices/monolithgcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:3.0.0 .
+    
+    ## redeploy container to GKE by update image
+    kubectl set image deployment/monolith monolith=gcr.io/${GOOGLE_CLOUD_PROJECT}/monolith:3.0.0
+    ```
+
+    - verify: `http://<MONOLITH_IP_ADDRESS>/products`
+
+  - Migrate frontend to microservice
+
+    ```sh
+    ## update to microservices url
+    cd ~/monolith-to-microservices/react-app
+    cp .env.monolith .envnpm run build
+    
+    ## cloud build
+    cd ~/monolith-to-microservices/microservices/src/frontend
+    gcloud builds submit --tag gcr.io/${GOOGLE_CLOUD_PROJECT}/frontend:1.0.0 .
+    
+    ## deploy container to GKE
+    kubectl create deployment frontend --image=gcr.io/${GOOGLE_CLOUD_PROJECT}/frontend:1.0.0
+    
+    ## expose GKE container
+    kubectl expose deployment frontend --type=LoadBalancer --port 80 --target-port 8080
+    kubectl get svc frontend
+    ```
+
+  - Delete the monolith
+
+    ```sh
+    kubectl delete deployment monolith
+    kubectl delete service monolith
+    ```
+
+  - Test Your Work by `http://<Frontend_IP_ADDRESS>`
