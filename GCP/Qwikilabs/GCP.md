@@ -14,3 +14,14 @@
   - Deploy, Scale, and Update Your Website on Google Kubernetes Engine
   - Migrating a Monolithic Website to Microservices on Google Kubernetes Engine
   - Build a Website on Google Cloud: Challenge Lab
+- [Perform Foundational Infrastructure Tasks in Google Cloud](./Perform-Foundational-Infrastructure-Tasks-in-Google-Cloud.md)
+  - Cloud Storage: Qwik Start - Cloud Console
+  - Cloud Storage: Qwik Start - CLI/SDK
+  - Cloud IAM: Qwik Start
+  - Cloud Monitoring: Qwik Start
+  - Cloud Functions: Qwik Start - Console
+  - Cloud Functions: Qwik Start - Command Line
+  - Google Cloud Pub/Sub: Qwik Start - Console
+  - Google Cloud Pub/Sub: Qwik Start - Command Line
+  - Google Cloud Pub/Sub: Qwik Start - Python
+  - Perform Foundational Infrastructure Tasks in Google Cloud: Challenge Lab
