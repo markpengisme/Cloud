@@ -129,3 +129,114 @@
   ```sh
   gsutil ls gs://${YOUR_BUCKET_NAME}
   ```
+
+## Cloud Monitoring: Qwik Start
+
+- Cloud Monitoring provides visibility into the performance, uptime, and overall health of cloud-powered applications.
+
+- Create a Compute Engine instance
+
+  - **Navigation menu** > **Compute Engine** > **VM instances** > **Create instance**
+
+    | Name         | lamp-1-vm                |
+    | ------------ | ------------------------ |
+    | Region       | us-central1 (Iowa)       |
+    | Zone         | us-central1-a            |
+    | Series       | N1                       |
+    | Machine type | n1-standard-2            |
+    | Firewall     | check Allow HTTP traffic |
+
+- Add Apache2 HTTP Server to your instance
+
+  - **SSH**
+
+    ```sh
+    sudo apt-get update
+    sudo apt-get install -y apache2 php7.0
+    sudo service apache2 restart
+    ```
+
+  - Click `lamp-1-vm`'s `External IP`
+
+- Create a Monitoring workspace
+
+  - **Navigation menu** > **Monitoring**
+
+- Install the Monitoring and Logging agents
+
+  - **SSH**
+
+    ```sh
+    ## install monitor agent
+    curl -sSO https://dl.google.com/cloudagents/add-monitoring-agent-repo.sh
+    sudo bash add-monitoring-agent-repo.sh
+    sudo apt-get update
+    sudo apt-get install -y stackdriver-agent
+    
+    ## install logging agent
+    curl -sSO https://dl.google.com/cloudagents/add-logging-agent-repo.sh
+    sudo bash add-logging-agent-repo.sh
+    sudo apt-get update
+    sudo apt-get install -y google-fluentd
+    ```
+
+- Create an uptime check
+
+  - **Navigation menu** > **Monitoring** > **Uptime checks** >  **Create Uptime Check**
+  - Title: Lamp Uptime Check
+    - Protocol: HTTP
+  - Resource Type: Instance
+    - Applies to: Single, lamp-1-vm
+  - Path: leave at default
+    - Duration: 1 min
+  - Test > Create
+
+- Create an alerting policy
+
+  - **Navigation menu** > **Monitoring** > **Alerting** > **Create Policy**
+  - Add condition
+    - Target
+      - Resource Type: VM Instance (gce_instance)
+      - Metric: Network traffic (gce_instance+1) `agent.googleapis.com/interface/traffic`
+    - Configuration
+      - Condition: is above
+      - Threshold: 500
+      - For: 1 minute
+    - ADD > Next
+  - **Notification Channels** > **Manage Notification Channels** > **EMAIL** > **ADD NEW**
+    - Email: personal email
+    - Display Name: random
+  - **Notification Channels** > **Refresh button** > select your display name > OK > Next
+  - Alert Name: Inbound Traffic Alert
+  - Documentation: Alert Test
+  - Save
+
+- Create a dashboard and chart
+
+  - **Navigation menu** > **Monitoring** > **Dashboard** > **Create Dashboard**
+  - Name: Cloud Monitoring LAMP Qwik Start Dashboard
+  - ADD CHART > Line
+    - CPU Load
+    - VM Instance
+    - CPU Load(1m)
+  - ADD CHART > Line
+    - Received Packets
+    - VM Instance
+    - Received Packets
+  - Refresh
+
+- View your logs
+
+  - **Navigation menu** > **Logging** > **Logs Explorer**
+    - **Resource** > **VM Instance** > **lamp-1-vm** > **ADD**
+    - Stream logs
+    - Open new tab , and check out what happens when you start and stop the VM instance.
+
+- Check the uptime check results and triggered alerts
+
+  - **Navigation menu** > **Monitoring** > **Uptime checks**.
+  - This view provides a list of all active uptime checks, and the status of each in different locations.
+  - Click Name to see details
+  - **Navigation menu** > **Monitoring** > **Alert**
+  - You see incidents and events listed in the Alerting window.
+  - Check email you should see Cloud Monitoring Alerts.
