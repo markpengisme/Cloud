@@ -240,3 +240,116 @@
   - **Navigation menu** > **Monitoring** > **Alert**
   - You see incidents and events listed in the Alerting window.
   - Check email you should see Cloud Monitoring Alerts.
+
+## Cloud Functions: Qwik Start - Console
+
+- Google Cloud Functions is a lightweight, event-based, asynchronous compute solution that allows you to create small, single-purpose functions that respond to cloud events without the need to manage a server or a runtime environment
+
+  - Cloud events are things that happen in your cloud environment.
+  - You create a response to an event with a trigger.
+  - Binding a function to a trigger allows you to capture and act on events
+  - [Events and Triggers](https://cloud.google.com/functions/docs/concepts/events-triggers)
+  - Use Case: Data Processing / ETL, Webhooks, Lightweight API, Mobile backend, IoT
+
+- Create a function
+
+  - **Navigation menu** > **Cloud Functions** > **Create Function**
+
+    | **Field**                                                    | **Value**                          |
+    | ------------------------------------------------------------ | ---------------------------------- |
+    | Function name                                                | GCFunction                         |
+    | Trigger                                                      | Select **HTTP** and click **Save** |
+    | Memory allocated (In Runtime, Build and Connections Settings) | Keep it default and click **Next** |
+
+- Deploy the function
+
+  - use default helloworld func
+
+    ```js
+    /**
+     * Responds to any HTTP request.
+     *
+     * @param {!express:Request} req HTTP request context.
+     * @param {!express:Response} res HTTP response context.
+     */
+    exports.helloWorld = (req, res) => {
+      let message = req.query.message || req.body.message || 'Hello World!';
+      res.status(200).send(message);
+    };
+    ```
+
+- Test the function
+
+  - **...** > **Test function**
+  - `{"message":"Hello World!"}`
+  - **Test the function**
+  - See the **Output** field
+  - See the **Logs** field: 200 status code
+
+- View logs
+
+  - go back > **...** > **View Logs**
+  - You can see 2 logs about the GCFunction
+
+## Cloud Functions: Qwik Start - Command Line
+
+- Create a function
+
+  - you're going to create a simple function named helloWorld. This function writes a message to the Cloud Functions logs.
+  - For this lab the cloud function event is a cloud pub/sub topic event. A pub/sub is a messaging service where the senders of messages are decoupled from the receivers of messages. When a message is sent or posted, a subscription is required for a receiver to be alerted and receive the message. Ref.[Google Cloud Pub/Sub: A Google-Scale Messaging Service](https://cloud.google.com/pubsub/architecture).
+
+  ```sh
+  mkdir gcf_hello_world
+  cd gcf_hello_world
+  vim index.js
+  ```
+
+  ```js
+  /**
+  * Background Cloud Function to be triggered by Pub/Sub.
+  * This function is exported by index.js, and executed when
+  * the trigger topic receives a message.
+  *
+  * @param {object} data The event payload.
+  * @param {object} context The event metadata.
+  */
+  exports.helloWorld = (data, context) => {
+  const pubSubMessage = data;
+  const name = pubSubMessage.data
+      ? Buffer.from(pubSubMessage.data, 'base64').toString() : "Hello World";
+  
+  console.log(`My Cloud Function: ${name}`);
+  };
+  ```
+
+- Create a cloud storage bucket
+
+  ```sh
+  gsutil mb -p ${PROJECT_ID} gs://${BUCKET_NAME}
+  ```
+
+- Deploy function
+
+  ```sh
+  gcloud functions deploy helloWorld \
+      --stage-bucket ${BUCKET_NAME} \
+      --trigger-topic hello_world \
+      --runtime nodejs8  
+      
+  ## Check active
+  gcloud functions describe helloWorld
+  ```
+
+- Test the function
+
+  ```sh
+  DATA=$(printf 'Hello World!'|base64) && gcloud functions call helloWorld --data '{"data":"'$DATA'"}'
+  ```
+
+- View logs
+
+  ```sh
+  ## need around 10 mins
+  ## Alternative way: Logging > Logs Explorer
+  gcloud functions logs read helloWorld
+  ```
