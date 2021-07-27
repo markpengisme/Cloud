@@ -206,7 +206,7 @@
   - **Notification Channels** > **Manage Notification Channels** > **EMAIL** > **ADD NEW**
     - Email: personal email
     - Display Name: random
-  - **Notification Channels** > **Refresh button** > select your display name > OK > Next
+  - **Notification Channels** > **Refresh button** > Select your display name > OK > Next
   - Alert Name: Inbound Traffic Alert
   - Documentation: Alert Test
   - Save
@@ -352,4 +352,137 @@
   ## need around 10 mins
   ## Alternative way: Logging > Logs Explorer
   gcloud functions logs read helloWorld
+  ```
+
+## Google Cloud Pub/Sub: Qwik Start - Console
+
+- Google Cloud Pub/Sub is a messaging service for exchanging event data among applications and services. A producer of data publishes messages to a Cloud Pub/Sub topic. A consumer creates a subscription to that topic. Subscribers either pull messages from a subscription or are configured as webhooks for push subscriptions. Every subscriber must acknowledge each message within a configurable window of time.
+
+- Setting up Pub/Sub
+
+  - **Navigation menu** > **Pub/Sub** > **Topics** > **Create topic**
+  - Topic ID:MyTopic
+  - uncheck the default subscription
+  - CREATE TOPIC
+
+- Add a subscription
+
+  - Click Topic **...** > **Create subscription**
+
+  - Subscription ID: MySub
+  - Delivery type: Pull
+  - CREATE
+
+- Publish a message to the topic
+
+  - Click **Topic ID**, see the topic details
+  - PUBLISH MESSAGE
+  - Message: Hello World
+  - PUBLISH
+
+- View the message
+
+  - VIEW MESSAGES
+  - Select Mysub
+  - PULL
+
+## Google Cloud Pub/Sub: Qwik Start - Command Line
+
+- The Pub/Sub basics: a producer publishes messages to a topic and a consumer creates a subscription to a topic to receive messages from it.
+
+- Pub/Sub topics & Pub/Sub subscriptions
+
+  ```sh
+  ## create topics and list them
+  gcloud pubsub topics create myTopic
+  gcloud pubsub topics create Test1
+  gcloud pubsub topics create Test2
+  gcloud pubsub topics list
+  gcloud pubsub topics delete Test1
+  gcloud pubsub topics delete Test2
+  gcloud pubsub topics list
+  
+  ## create subscriptions to the topic and list them
+  gcloud pubsub subscriptions create --topic myTopic mySubscription
+  gcloud pubsub subscriptions create --topic myTopic Test1
+  gcloud pubsub subscriptions create --topic myTopic Test2
+  gcloud pubsub topics list-subscriptions myTopic
+  gcloud pubsub subscriptions delete Test1
+  gcloud pubsub subscriptions delete Test2
+  gcloud pubsub topics list-subscriptions myTopic
+  ```
+
+- Pub/Sub Publishing and Pulling the Message
+
+  - Using the pull command without any flags will output only one message, even if you are subscribed to a topic that has more held in it.
+
+  ```sh
+  ## publish messages
+  gcloud pubsub topics publish myTopic --message "Hello"
+  gcloud pubsub topics publish myTopic --message "Publisher's name is <YOUR NAME>"
+  gcloud pubsub topics publish myTopic --message "Publisher likes to eat <FOOD>"
+  gcloud pubsub topics publish myTopic --message "Publisher thinks Pub/Sub is awesome"
+  
+  ## pull by subscription
+  gcloud pubsub subscriptions pull mySubscription --auto-ack
+  gcloud pubsub subscriptions pull mySubscription --auto-ack
+  gcloud pubsub subscriptions pull mySubscription --auto-ack
+  gcloud pubsub subscriptions pull mySubscription --auto-ack
+  
+  ## publish messages again
+  gcloud pubsub topics publish myTopic --message "Publisher is starting to get the hang of Pub/Sub"
+  gcloud pubsub topics publish myTopic --message "Publisher wonders if all messages will be pulled"
+  gcloud pubsub topics publish myTopic --message "Publisher will have to test to find out"
+  
+  ## pull all
+  gcloud pubsub subscriptions pull mySubscription --auto-ack --limit=3
+  ```
+
+## Google Cloud Pub/Sub: Qwik Start - Python
+
+- Create a virtual environment
+
+  ```sh
+  sudo apt-get update
+  sudo apt-get install -y virtualenv
+  virtualenv -p python3 venv
+  source venv/bin/activate
+  ```
+
+- Install the client library
+
+  ```sh
+  pip install --upgrade google-cloud-pubsub
+  git clone https://github.com/googleapis/python-pubsub.gitcd python-pubsub/samples/snippets
+  ```
+
+- Create a topic & subsciption
+
+  ```sh
+  export GLOBAL_CLOUD_PROJECT=GCP Project ID
+  cat publisher.py
+  python publisher.py -h
+  
+  ## create a topic
+  python publisher.py $GLOBAL_CLOUD_PROJECT create MyTopic
+  
+  ## list
+  python publisher.py $GLOBAL_CLOUD_PROJECT list
+  cat subscriber.py
+  python subscriber.py -h
+  
+  ## Create a subscription
+  python subscriber.py $GLOBAL_CLOUD_PROJECT create MyTopic MySub
+  
+  ## list
+  python subscriber.py $GLOBAL_CLOUD_PROJECT list-in-topic MyTopic
+  ```
+
+- Publish and Pull messages
+
+  ```sh
+  ## publish messages
+  python publisher.py $GLOBAL_CLOUD_PROJECT publish MyTopic
+  ## pull messages
+  python subscriber.py $GLOBAL_CLOUD_PROJECT receive MySub
   ```
