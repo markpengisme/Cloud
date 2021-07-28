@@ -486,3 +486,78 @@
   ## pull messages
   python subscriber.py $GLOBAL_CLOUD_PROJECT receive MySub
   ```
+
+## Perform Foundational Infrastructure Tasks in Google Cloud: Challenge Lab
+
+- Scnerio: You are now asked to help a newly formed development team with some of their initial work on a new project around storing and organizing photographs, called memories. You have been asked to assist the memories team with initial configuration for their application development environment; you receive the following request to complete the following tasks:
+
+  - Create a bucket for storing the photographs.
+  - Create a Pub/Sub topic that will be used by a Cloud Function you create.
+  - Create a Cloud Function.
+  - Remove the previous cloud engineer’s access from the memories project.
+
+- Task 1: Create a bucket
+
+  ```sh
+  gsutil mb -p ${PROJECT_ID} -l us-east1 gs://${BUCKET_NAME}
+  ```
+
+- Task 2: Create a Pub/Sub topic
+
+  ```sh
+  gcloud pubsub topics create myTopic
+  gcloud pubsub subscriptions create --topic myTopic mySubscription
+  ```
+
+- Task 3: Create the thumbnail Cloud Function
+
+  ```sh
+  wget https://storage.googleapis.com/cloud-training/gsp315/map.jpgvi index.js
+  ```
+
+  - index.js: replace Line:15 to your topic id
+
+  - package.json
+  
+  ```json
+  {
+    "name": "thumbnails",
+    "version": "1.0.0",
+    "description": "Create Thumbnail of uploaded image",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "@google-cloud/storage": "1.5.1",
+      "@google-cloud/pubsub": "^0.18.0",
+      "fast-crc32c": "1.0.4",
+      "imagemagick-stream": "4.1.1"
+    },
+    "devDependencies": {},
+    "engines": {
+      "node": ">=4.3.2"
+    }
+  }
+  ```
+  
+  ```sh
+  ## Deploy function
+  gcloud functions deploy thumbnail \
+      --region us-east1 \
+      --source . \
+      --stage-bucket ${BUCKET_NAME} \
+      --trigger-event google.storage.object.finalize  \
+      --trigger-resource ${BUCKET_NAME} \
+      --runtime nodejs10
+      
+  ## Check active
+  gcloud functions describe thumbnail
+  
+  ## Upload imagegsutil 
+  cp map.jpg gs://${BUCKET_NAME}/map.jpg
+  ```
+  
+- Task 4: Remove the previous cloud engineer
+
+  - GUI is easy to do this task
+  - Use IAM and delete Viewer permissions of Username 2
