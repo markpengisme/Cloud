@@ -25,3 +25,10 @@
   - Google Cloud Pub/Sub: Qwik Start - Command Line
   - Google Cloud Pub/Sub: Qwik Start - Python
   - Perform Foundational Infrastructure Tasks in Google Cloud: Challenge Lab
+- [Application Development - Python](./Application-Development-Python.md)
+  - App Dev: Setting up a Development Environment - Python
+  - App Dev: Storing Application Data in Cloud Datastore - Python
+  - App Dev: Storing Image and Video Files in Cloud Storage - Python
+  - App Dev: Adding User Authentication to your Application - Python
+  - App Dev: Developing a Backend Service - Python
+  - App Dev: Deploying the Application into Kubernetes Engine - Python
