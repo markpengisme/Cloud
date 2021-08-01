@@ -154,3 +154,161 @@
   - **Navigation menu** > **Datastore** > **Entities**
 
   - **Web preview** > **Preview on port 8080** > **Take Test** > **GCP**
+
+## App Dev: Storing Image and Video Files in Cloud Storage - Python
+
+- Prepare the Quiz application
+
+  ```sh
+  git clone https://github.com/GoogleCloudPlatform/training-data-analyst
+  cd ~/training-data-analyst/courses/developingapps/python/cloudstorage/start
+  . prepare_environment.sh
+  python run_server.py
+  ```
+
+  ```sh
+  ## Ref
+  ## run_server.py
+  echo "Creating Datastore/App Engine instance"
+  gcloud app create --region "us-central"
+  
+  echo "Creating bucket: gs://$DEVSHELL_PROJECT_ID-media"
+  gsutil mb gs://$DEVSHELL_PROJECT_ID-media
+  
+  echo "Exporting GCLOUD_PROJECT and GCLOUD_BUCKET"
+  export GCLOUD_PROJECT=$DEVSHELL_PROJECT_ID
+  export GCLOUD_BUCKET=$DEVSHELL_PROJECT_ID-media
+  
+  echo "Creating virtual environment"
+  mkdir ~/venvs
+  virtualenv ~/venvs/developingapps
+  source ~/venvs/developingapps/bin/activate
+  
+  echo "Installing Python libraries"
+  pip install --upgrade pip
+  pip install -r requirements.txt
+  
+  echo "Creating Datastore entities"
+  python add_entities.py
+  
+  echo "Project ID: $DEVSHELL_PROJECT_ID"
+  
+  ```
+
+  - **Web preview** > **Preview on port 8080**> **Create Question**
+
+- Examine the Quiz application code
+
+  - **Open Editor** > `/training-data-analyst/courses/developingapps/python/cloudstorage/start`
+  - `quiz/webapp/templates/add.html`: template for the Create Question form.
+    - `<form enctype="multipart/form-data" method="post">`
+    - add two input: imageUrl(hidden) & image
+  - `quiz/webapp/routes.py`: contains the routes for creating a question handler that receives the form data including image file
+  - `quiz/webapp/question.py`: contains the handler that procrsses the form data extracted from routes.py
+  - `quiz/gcp/storage.py`: save image file data into Cloud Storage.
+
+- Create a Cloud Storage Bucket
+
+  ```sh
+  gsutil mb gs://$DEVSHELL_PROJECT_ID-media
+  export GCLOUD_BUCKET=$DEVSHELL_PROJECT_ID-media
+  ```
+
+- Adding objects to Cloud Storage
+
+  - Import and use the Python Cloud Storage module
+
+    ```python
+    ## quiz/gcp/storage.py
+    import os
+    
+    project_id = os.getenv('GCLOUD_PROJECT')
+    bucket_name = os.getenv('GCLOUD_BUCKET')
+    
+    from google.cloud import storage
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(bucket_name)
+    
+    
+    """
+    Uploads a file to a given Cloud Storage bucket and returns the public url
+    to the new object.
+    """
+    def upload_file(image_file, public):
+        blob = bucket.blob(image_file.filename)
+        blob.upload_from_string(
+            image_file.read(),
+            content_type=image_file.content_type)
+        
+        if public:
+            blob.make_public()
+            
+        return blob.public_url
+    ```
+
+  - Write code to use the Cloud Storage functionality
+
+    ```python
+    ## quiz/webapp/questions.py
+    from quiz.gcp import storage, datastore
+    
+    """
+    uploads file into google cloud storage
+    - upload file
+    - return public_url
+    """
+    def upload_file(image_file, public):
+        if not image_file:
+            return None
+        
+        public_url = storage.upload_file(
+           image_file, 
+           public
+        )
+        
+        return public_url
+    
+    """
+    uploads file into google cloud storage
+    - call method to upload file (public=true)
+    - call datastore helper method to save question
+    """
+    def save_question(data, image_file):
+        if image_file:
+            data['imageUrl'] = unicode(upload_file(image_file, True))
+        else:
+            data['imageUrl'] = u''
+    
+        data['correctAnswer'] = int(data['correctAnswer'])
+        datastore.save_question(data)
+        return
+    ```
+
+  - Run the application and create a Cloud Storage object
+
+    - [Download img file](https://storage.googleapis.com/cloud-training/quests/Google_Cloud_Storage_logo.png)
+
+    - **Web preview** > **Preview on port 8080** > **Create Question** >**Save**
+
+      | Form Field | Value                                                        |
+      | :--------- | :----------------------------------------------------------- |
+      | Author     | Mark                                                         |
+      | Quiz       | Google Cloud Platform                                        |
+      | Title      | Which product does this logo relate to?                      |
+      | Image      | Upload the Google_Cloud_Storage_logo.png file you previously downloaded |
+      | Answer 1   | App Engine                                                   |
+      | Answer 2   | Cloud Storage (Select the Answer 2 radio button)             |
+      | Answer 3   | Compute Engine                                               |
+      | Answer 4   | Container Engine                                             |
+
+    - **Navigation menu** > **Cloud Storage** > **Browser** > Click `<Project ID>-media` Bucket
+
+      - Check `Google_Cloud_Storage_logo.png` exists
+
+    - **Web preview** > **Preview on port 8080** > **Take Test** > **GCP**
+
+      - Check the image show in the question you just added
+
+    - Add `/api/quizzes/gcp` to app's URL
+
+      - Check the JSON data have the question you just added
