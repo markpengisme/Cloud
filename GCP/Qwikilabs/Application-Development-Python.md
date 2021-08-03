@@ -312,3 +312,102 @@
     - Add `/api/quizzes/gcp` to app's URL
 
       - Check the JSON data have the question you just added
+
+## App Dev: Adding User Authentication to your Application - Python
+
+- Prepare the case study application
+
+  ```sh
+  git clone https://github.com/GoogleCloudPlatform/training-data-analyst
+  # soft link
+  ln -s ~/training-data-analyst/courses/developingapps/v1.2/python/firebase ~/firebase
+  cd ~/firebase/start
+  . prepare_environment.sh
+  python run_server.py
+  ```
+
+  ```sh
+  ## Ref
+  ## prepare_environment.sh
+  echo "Creating Datastore/App Engine instance"
+  gcloud app create --region "us-central"
+  
+  echo "Creating bucket: gs://$DEVSHELL_PROJECT_ID-media"
+  gsutil mb gs://$DEVSHELL_PROJECT_ID-media
+  
+  echo "Exporting GCLOUD_PROJECT and GCLOUD_BUCKET"
+  export GCLOUD_PROJECT=$DEVSHELL_PROJECT_ID
+  export GCLOUD_BUCKET=$DEVSHELL_PROJECT_ID-media
+  
+  echo "Creating virtual environment"
+  mkdir ~/venvs
+  virtualenv -p python3 ~/venvs/developingapps
+  source ~/venvs/developingapps/bin/activate
+  
+  echo "Installing Python libraries"
+  pip install --upgrade pip
+  pip install -r requirements.txt
+  
+  echo "Creating Datastore entities"
+  python add_entities.py
+  
+  echo "Project ID: $DEVSHELL_PROJECT_ID"
+  ```
+
+- Examine the case study application code
+
+  - **Open Editor** > `/training_data_analyst/courses/developingapps/v1.2/python/firebase/start`
+  - `quiz/webapp/static/client/index.html`: AngularJS Single Page Application
+  - `quiz/webapp/static/client/app/auth/qiq-login-template.html`: AngularJS template for the Login component
+  - `quiz/webapp/static/client/app/auth/qiq-login.js`: AngularJS component, allows the user to log in to the application or to navigate to a registration page
+
+- Create a Firebase project
+
+  - Open new tab and go to [here](https://console.firebase.google.com/) , then sign in
+  - On the **Welcome to Firebase!** page, click **Add project**
+  - In the **Enter your project name** dialog, select your project name.
+  - Check **I accept the Firebase terms**. Click **Continue**
+  - In the **Confirm Firebase billing plan** dialog, click **Confirm Plan**
+  - In the **A few things to remember when adding Firebase to a Google Cloud project** dialog, click **Continue**
+  - In the **Google Analytics for your Firebase project** dialog, click **Continue**
+  - In the **Configure Google Analytics** dialog: Uncheck first and Check all the other(2~7), then click **Add Firebase**
+  - Click **Continue**
+
+- Configure Firebase Authentication
+
+  - **Build > Authentication**
+  - Click on **Get started**
+  - In **Sign-in method** , Enable **Emall/Password**, **Enable** first, click **Save**
+  - In  **Authorized Domains** , Add the quiz webapp domain, like `8080-XXXXXXXXXXX.dev`
+
+- Integrate a client-side web application with Firebase
+
+  - Click **Project Overview**
+
+  - Click the web icon
+
+  - Input nick name **quiz**, then click **Register app**
+
+  - **Copy** Firebase SDK scripts, and open  `quiz/webapp/static/client/index.html`
+
+  - Paste the script before the other `<script></script>` tags
+
+  - Add the `firebase-auth.js`, the result like below
+
+    ```html
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/8.7.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.7.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.7.1/firebase-analytics.js"></script>
+    ```
+
+  - Save **index.html**
+
+- Test the application
+
+  - Return to the quiz application and refresh page
+  - **Take Test** > **GCP**
+  - Click **Register**, and register an account
+    - You should now be logged in and redirected to the quiz
+  - Click **Logout**
+    - You should be logged out and redirected to the homepage
