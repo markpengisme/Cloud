@@ -411,3 +411,414 @@
     - You should now be logged in and redirected to the quiz
   - Click **Logout**
     - You should be logged out and redirected to the homepage
+
+## App Dev: Developing a Backend Service - Python
+
+- This lab concentrates on the backend service, putting together Pub/Sub, Natural Language, and Spanner services and APIs to collect and analyze feedback and scores from an online Quiz application.
+
+- Prepare the Quiz Application
+
+  ```sh
+  git clone https://github.com/GoogleCloudPlatform/training-data-analyst
+  cd ~/training-data-analyst/courses/developingapps/v1.2/python/pubsub-languageapi-spanner/start
+  . prepare_web_environment.sh
+  python run_server.py
+  ```
+
+  ```sh
+  ## Ref
+  ## run_server.py
+  echo "Creating quiz-account Service Account"
+  gcloud iam service-accounts create quiz-account --display-name "Quiz Account"
+  gcloud iam service-accounts keys create key.json --iam-account=quiz-account@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com
+  
+  echo "Setting quiz-account IAM Role"
+  gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID --member serviceAccount:quiz-account@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role roles/owner
+  
+  echo "Creating Datastore/App Engine instance"
+  gcloud app create --region "us-central"
+  
+  echo "Creating bucket: gs://$DEVSHELL_PROJECT_ID-media"
+  gsutil mb gs://$DEVSHELL_PROJECT_ID-media
+  
+  echo "Exporting GCLOUD_PROJECT and GCLOUD_BUCKET"
+  export GCLOUD_PROJECT=$DEVSHELL_PROJECT_ID
+  export GCLOUD_BUCKET=$DEVSHELL_PROJECT_ID-media
+  
+  echo "Creating virtual environment"
+  mkdir ~/venvs
+  virtualenv -p python3 ~/venvs/developingapps
+  source ~/venvs/developingapps/bin/activate
+  
+  echo "Installing Python libraries"
+  pip install --upgrade pip
+  pip install -r requirements.txt
+  
+  echo "Creating Datastore entities"
+  python add_entities.py
+  
+  echo "Export credentials key.json"
+  export GOOGLE_APPLICATION_CREDENTIALS=key.json
+  
+  echo "Project ID: $DEVSHELL_PROJECT_ID"
+  ```
+
+  - Second shell
+
+  ```sh
+  cd ~/training-data-analyst/courses/developingapps/v1.2/python/pubsub-languageapi-spanner/start
+  . run_worker.sh
+  ```
+
+  ```sh
+  ## Ref
+  ## run_worker.sh
+  echo "Exporting GCLOUD_PROJECT and GCLOUD_BUCKET and GOOGLE_APPLICATION_CREDENTIALS"
+  export GCLOUD_PROJECT=$DEVSHELL_PROJECT_ID
+  export GCLOUD_BUCKET=$DEVSHELL_PROJECT_ID-media
+  export GOOGLE_APPLICATION_CREDENTIALS=key.json
+  
+  echo "Switching to virtual environment"
+  source ~/venvs/developingapps/bin/activate
+  
+  echo "Starting worker"
+  python -m quiz.console.worker
+  ```
+
+  - **Web preview** > **Preview on port 8080** > **Take Test** > **Places**
+  - After answer the question, **Send Feedback** button not yet work
+
+- Examine the Quiz application code
+
+  - **Open Editor** > `/training-data-analyst/courses/developingapps/v1.2/python/pubsub-languageapi-spanner/start`
+  - `quiz/gcp/pubsub.py`: This file contains a module that allows applications to publish feedback messages to a Cloud Pub/Sub topic and register a callback to receive messages from a Cloud Pub/Sub subscription.
+  - `quiz/gcp/languageapi.py`: This file contains a module that allows users to send text to the Cloud Natural Language ML API and to receive the sentiment score from the API.
+  - `quiz/gcp/spanner.py`: This file contains a module that allows users to save the feedback and Natural Language API response data in a Cloud Spanner database instance.
+  - `quiz/api/api.py`: publishes the feedback data received from the client to Pub/Sub.
+  - `quiz/console/worker.py`: This file runs as a separate console application to consume the messages delivered to a Pub/Sub subscription.
+
+- Work with Cloud Pub/Sub
+
+  - **Navigation menu** > **Pub/Sub** > **Topics** > **CREATE TOPIC**
+
+    - Topic ID: feedback
+    - CREATE TOPIC
+
+  - Second Shell
+
+    - Ctrl+c
+
+    - Create subscription **worker-subscription**: `gcloud pubsub subscriptions create worker-subscription --topic feedback`
+
+    - Publish & Retrieve Test
+
+      ```sh
+      gcloud pubsub topics publish feedback --message "Hello World"
+      gcloud beta pubsub subscriptions pull worker-subscription --auto-ack
+      ```
+
+- Publish Messages to Cloud Pub/Sub Programmatically
+
+  - `quiz/gcp/pubsub.py`:
+
+    - Import and use the Python Cloud Pub/Sub module to create publisher client and topic object
+    - Publish a message to Cloud Pub/Sub
+
+    ```python
+    import json
+    import logging
+    import os
+    project_id = os.getenv('GCLOUD_PROJECT')
+    
+    from google.cloud import pubsub_v1
+    from flask import current_app
+    
+    ## publisher & topic
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(project_id, 'feedback')
+    
+    
+    """
+    Publishes feedback info
+    - jsonify feedback object
+    - encode as bytestring
+    - publish message
+    - return result
+    """
+    def publish_feedback(feedback):
+        payload = json.dumps(feedback, indent=2,sort_keys=True)
+        data = payload.encode('utf-8')
+        future = publisher.publish(topic_path, data=data)
+        return future.result()
+    
+    ```
+
+  - Run the application and create a Pub/Sub message
+
+    - **Take Test** > **Places** > **Send Feedback**
+    - Sencond Shell: `gcloud pubsub subscriptions pull worker-subscription --auto-ack`
+
+- Subscribe to Cloud Pub/Sub Topics Programmatically
+
+  - `quiz/gcp/pubsub.py`
+
+    - Create a Cloud Pub/Sub subscription and receive messages
+
+    ```python
+    ## ...
+    sub_client = pubsub_v1.SubscriberClient()
+    sub_path = sub_client.subscription_path(project_id, 'worker-subscription')
+    
+    ## ...
+    """pull_feedback
+    Starts pulling messages from subscription
+    - receive callback function from calling module
+    - initiate the pull providing the callback function
+    """
+    def pull_feedback(callback):
+        sub_client.subscribe(sub_path, callback=callback)
+    ```
+
+  - `quiz/console/worker.py`
+
+    - Use the Pub/Sub subscribe functionality
+
+    ```python
+    import logging
+    import sys
+    import time
+    import json
+    from quiz.gcp import pubsub
+    
+    
+    """
+    Configure logging
+    """
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    log = logging.getLogger()
+    
+    """
+    Receives pulled messages, analyzes and stores them
+    - Acknowledge the message
+    - Log receipt and contents
+    """
+    def pubsub_callback(message):
+        message.ack()
+        log.info('Message received')
+        log.info(message)
+    
+    """
+    Pulls messages and loops forever while waiting
+    - initiate pull
+    - loop once a minute, forever
+    """
+    def main():
+        log.info('Worker starting...')
+        ## register callback
+        pubsub.pull_feedback(pubsub_callback)
+        while True:
+            time.sleep(60)
+    
+    if __name__ == '__main__':
+        main()
+    ```
+
+  - Run the web and worker application and create a Pub/Sub message
+
+    - Firsh Shell: `python run_server.py`
+    - Sencond Shell: `. run_worker.sh`
+    - **Take Test** > **Places** > **Send Feedback**
+      - Sencon Shell will show feedback massage
+
+- Use the Cloud Natural Language API([ref](https://cloud.google.com/natural-language/docs/reference/rest/))
+
+  - In this section you write the code to perform sentiment analysis on the feedback text submitted by the user.
+
+  - `quiz/gcp/languageapi.py`
+
+    - Use the Cloud Natural Language API
+
+    ```python
+    ## import language module
+    from google.cloud import language_v1
+    
+    ## create language api client
+    lang_client = language_v1.LanguageServiceClient()
+    
+    """
+    Returns sentiment analysis score
+    - create document from passed text
+    - do sentiment analysis using natural language applicable
+    - return the sentiment score
+    """
+    def analyze(text):
+        doc = language_v1.types.Document(content=text, type_='PLAIN_TEXT')
+        sentiment = lang_client.analyze_sentiment(document=doc).document_sentiment
+        return sentiment.score
+    ```
+
+  - `quiz/console/worker.py`
+
+    ```python
+    from quiz.gcp import pubsub, languageapi
+    #...
+    """
+    Receives pulled messages, analyzes and stores them
+    - Acknowledge the message
+    - Log receipt and contents
+    - convert json string
+    - call helper module to do sentiment analysis
+    - log sentiment score
+    """
+    def pubsub_callback(message):
+        message.ack()
+        log.info('Message received')
+        log.info(message)
+        data = json.loads(message.data)
+        score = languageapi.analyze(str(data['feedback']))
+        log.info('Score: {}'.format(score))
+        data['score'] = score
+    ```
+
+  - Run the web and worker application and test the Natural Language API
+
+    - Firsh Shell: `python run_server.py`
+    - Sencond Shell: `. run_worker.sh`
+    - **Take Test** > **Places** > **Send Feedback**
+      - Sencon Shell will show the sentiment score
+
+- Persist Data to Cloud Spanner
+
+  - In this section you create a Cloud Spanner instance, database, and table. Then you write the code to persist the feedback data into the database.
+
+  - Create a Cloud Spanner instance
+
+    - **Navigation menu** > **Spanner** > **CREATE INSTANCE**
+    - Instance name: quiz-instance
+    - region: us-central1
+    - Create
+
+  - Create a Cloud Spanner database and table
+
+    - **Instance Overview** >**quiz-instance** > **CREATE DATABASE**
+
+    - Database Name: quiz-database
+
+    - Schema
+
+      ```sql
+      CREATE TABLE Feedback (
+          feedbackId STRING(100) NOT NULL,
+          email STRING(100),
+          quiz STRING(20),
+          feedback STRING(MAX),
+          rating INT64,
+          score FLOAT64,
+          timestamp INT64
+      )
+      PRIMARY KEY (feedbackId);
+      ```
+
+    - Create
+
+  - Persist data into Cloud Spanner
+
+    - `quiz/gcp/spanner.py`
+
+      ```python
+      import re
+      from google.cloud import spanner
+      
+      """
+      Get spanner management objects
+      Get a reference to the Cloud Spanner quiz-instance
+      Get a referent to the Cloud Spanner quiz-database
+      """
+      spanner_client = spanner.Client()
+      instance = spanner_client.instance('quiz-instance')
+      database = instance.database('quiz-database')
+      
+      """
+      Takes an email address and reverses it (to be used as primary key)
+      """
+      def reverse_email(email):
+          return '_'.join(list(reversed(email.replace('@','_').
+                              replace('.','_').
+                              split('_'))))
+      
+      """
+      Persists feedback data into Spanner
+      - create primary key value(feedback_id)
+      - do a batch insert (even though it's a single record)
+      """
+      def save_feedback(data):
+          # Create a batch object for database operations
+          with database.batch() as batch:
+              feedback_id = '{}_{}_{}'.format(
+                          reverse_email(data['email']),
+                          data['quiz'],
+                          data['timestamp'])
+      
+              batch.insert(
+                  table='feedback',
+                  columns=(
+                      'feedbackId',
+                      'email',
+                      'quiz',
+                      'timestamp',
+                      'rating',
+                      'score',
+                      'feedback'
+                  ),
+                  values=[
+                      (
+                          feedback_id,
+                          data['email'],
+                          data['quiz'],
+                          data['timestamp'],
+                          data['rating'],
+                          data['score'],
+                          data['feedback']
+                      )
+                  ]
+              )
+      ```
+
+    - `quiz/console/worker.py`: Use the Cloud Spanner functionality
+
+      ```python
+      from quiz.gcp import pubsub, languageapi, spanner
+      #...
+      
+      """
+      Receives pulled messages, analyzes and stores them
+      - Acknowledge the message
+      - Log receipt and contents
+      - convert json string
+      - call helper module to do sentiment analysis
+      - log sentiment score
+      - call helper module to persist to spanner
+      - log feedback saved
+      """
+      def pubsub_callback(message):
+          message.ack()
+          log.info('Message received')
+          log.info(message)
+          data = json.loads(message.data)
+          score = languageapi.analyze(str(data['feedback']))
+          log.info('Score: {}'.format(score))
+          data['score'] = score
+      
+          spanner.save_feedback(data)
+          log.info('Feedback saved')
+      ```
+
+  - Run the web and worker application and test Cloud Spanner
+
+    - Firsh Shell: `python run_server.py`
+    - Sencond Shell: `. run_worker.sh`
+    - **Take Test** > **Places** > **Send Feedback**
+      - Sencon Shell will show the feedback saved
+    - **Navigation menu** > **Spanner** >  **quiz-instance > quiz-database > Query**
+      - `SELECT * FROM Feedback`
+      - You shoudl see the new feedback record
