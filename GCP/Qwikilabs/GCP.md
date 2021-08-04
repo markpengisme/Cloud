@@ -32,3 +32,6 @@
   - App Dev: Adding User Authentication to your Application - Python
   - App Dev: Developing a Backend Service - Python
   - App Dev: Deploying the Application into Kubernetes Engine - Python
+- [Cloud Development](./Cloud-Development.md)
+  - App Dev - Deploying the Application into App Engine Flexible Environment - Java
+  - Cloud Profiler: Qwik Start
