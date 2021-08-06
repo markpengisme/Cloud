@@ -35,3 +35,11 @@
 - [Cloud Development](./Cloud-Development.md)
   - App Dev - Deploying the Application into App Engine Flexible Environment - Java
   - Cloud Profiler: Qwik Start
+- [Google Cloud Solutions I: Scaling Your Infrastructure](./Google-Cloud-Solutions-Scaling-Your-Infrastructure)
+  - Autoscaling an Instance Group with Custom Cloud Monitoring Metrics
+  - Setting up Jenkins on Kubernetes Engine
+  - Continuous Delivery Pipelines with Spinnaker and Kubernetes Engine
+  - Deploying a Fault-Tolerant Microsoft Active Directory Environment
+  - Deploying Memcached on Kubernetes Engine
+  - Running Dedicated Game Servers(DGS) in Google Kubernetes Engine
+  - Distributed Load Testing Using Kubernetes
