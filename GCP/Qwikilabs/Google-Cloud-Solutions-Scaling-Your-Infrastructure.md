@@ -99,3 +99,58 @@
   > Since this group had a head start, you can see the autoscaling details about the instance group in the autoscaling graph. The autoscaler will take about five minutes to correctly recognize the custom metric and it can take up to ten minutes for the script to generate sufficient data to trigger the autoscaling behavior.
 
 - [Autoscaling example](https://www.qwiklabs.com/focuses/611?parent=catalog#step12)
+
+## Setting up Jenkins on Kubernetes Engine
+
+- Prepare the Environment
+
+  ```sh
+  gcloud config set compute/zone us-east1-d
+  git clone https://github.com/GoogleCloudPlatform/continuous-deployment-on-kubernetes.git
+  cd continuous-deployment-on-kubernetes
+  
+  ## create k8s cluster
+  gcloud container clusters create jenkins-cd \
+  --num-nodes 2 \
+  --machine-type n1-standard-2 \
+  --scopes "https://www.googleapis.com/auth/projecthosting,cloud-platform"
+  
+  gcloud container clusters list
+  gcloud container clusters get-credentials jenkins-cd
+  kubectl cluster-info
+  ```
+
+- Configure Helm
+
+  - Helm is a package manager that makes it easy to configure and deploy Kubernetes applications.
+
+  ```sh
+  helm version
+  helm repo add stable https://charts.helm.sh/stable
+  helm repo update
+  ```
+
+- Configure and Install Jenkins
+
+  - You will use the `jenkins/values.yaml`  to add the Google Cloud specific plugin necessary to use service account credentials to reach your Cloud Source Repository.
+  - Jenkins plugin to run dynamic agents in a Kubernetes cluster, the plugin creates a Kubernetes Pod for each agent started, and stops it after each build.
+
+  ```sh
+  ## name=cd, chart=stable/jenkins
+  helm install cd stable/jenkins -f jenkins/values.yaml --version 1.2.2 --wait
+  kubectl get pods
+  
+  ## port forwarding
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/component=jenkins-master" -l "app.kubernetes.io/instance=cd" -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward $POD_NAME 8080:8080 >> /dev/null &
+  
+  ## 
+  kubectl get svc
+  ```
+
+- Connect to Jenkins
+
+  - **Web Preview** > **Preview on port 8080**
+    - username: admin
+    - password: password get by: `printf $(kubectl get secret cd-jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode);echo`
+  - You can try to set a pipeline and build it, and use `kubectl get pods` to see the agent start.
