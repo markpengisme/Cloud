@@ -408,3 +408,88 @@
   ```
 
   - When the build and then the pipeline completes, all versions will show orange background
+
+## Deploying a Fault-Tolerant Microsoft Active Directory Environment
+
+- This lab is part of a series aimed at helping you deploy a highly available Windows architecture on Google Cloud with Microsoft Active Directory (AD), SQL Server, and Internet Information Services (IIS). In this lab you set up a redundant pair of Windows Domain Controllers (DC) with AD using a new Virtual Private Cloud (VPC) network and multiple subnets.
+
+- Initializing common variables
+
+  ```sh
+  export region1=us-central1
+  export region2=us-west2
+  export zone_1=${region1}-b
+  export zone_2=${region2}-c
+  export vpc_name=webappnet
+  export project_id=$(gcloud config get-value project)
+  gcloud config set compute/region ${region1}
+  ```
+
+- Creating the network infrastructure
+
+  ```sh
+  ## VPC network
+  gcloud compute networks create ${vpc_name}  \
+      --description "VPC network to deploy Active Directory" \
+      --subnet-mode custom
+  
+  ## subnet
+  gcloud compute networks subnets create private-ad-zone-1 \
+      --network ${vpc_name} \
+      --range 10.1.0.0/24 \
+      --region ${region1}
+      
+  gcloud compute networks subnets create private-ad-zone-2 \
+      --network ${vpc_name} \
+      --range 10.2.0.0/24 \
+      --region ${region2}
+      
+  ## internal firewall rule between two subnet
+  gcloud compute firewall-rules create allow-internal-ports-private-ad \
+      --network ${vpc_name} \
+      --allow tcp:1-65535,udp:1-65535,icmp \
+      --source-ranges  10.1.0.0/24,10.2.0.0/24
+  
+  ## RDP firewall rule
+  gcloud compute firewall-rules create allow-rdp \
+      --network ${vpc_name} \
+      --allow tcp:3389 \
+      --source-ranges 0.0.0.0/0
+  ```
+
+- Creating the first domain controller
+
+  ```sh
+  gcloud compute instances create ad-dc1 --machine-type n1-standard-2 \
+      --boot-disk-type pd-ssd \
+      --boot-disk-size 50GB \
+      --image-family windows-2016 --image-project windows-cloud \
+      --network ${vpc_name} \
+      --zone ${zone_1} --subnet private-ad-zone-1 \
+      --private-network-ip=10.1.0.100
+      
+  ## create password
+  gcloud compute reset-windows-password ad-dc1 --zone ${zone_1} --quiet --user=admin
+  ## Save the ip-address, username and password returned in Cloud Shell 
+  ```
+
+- Creating the second domain controller
+
+  ```sh
+  export region2=us-west2
+  export zone_2=${region2}-c
+  export vpc_name=webappnet
+  export project_id=$(gcloud config get-value project)
+  gcloud config set compute/region ${region2}
+  gcloud compute instances create ad-dc2 --machine-type n1-standard-2 \
+      --boot-disk-size 50GB \
+      --boot-disk-type pd-ssd \
+      --image-family windows-2016 --image-project windows-cloud \
+      --can-ip-forward \
+      --network ${vpc_name} \
+      --zone ${zone_2} \
+      --subnet private-ad-zone-2 \
+      --private-network-ip=10.2.0.100
+  ```
+
+  ==Shelve this class, cause i do not have RDP software==
