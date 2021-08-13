@@ -154,3 +154,257 @@
     - username: admin
     - password: password get by: `printf $(kubectl get secret cd-jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode);echo`
   - You can try to set a pipeline and build it, and use `kubectl get pods` to see the agent start.
+
+## Continuous Delivery Pipelines with Spinnaker and Kubernetes Engine
+
+- This hands-on lab shows you how to create a continuous delivery pipeline using Google Kubernetes Engine, Google Cloud Source Repositories, Google Cloud Container Builder, and Spinnaker.
+
+- Pipeline architecture
+
+  - To continuously deliver application updates to your users, you need an automated process that reliably builds, tests, and updates your software.
+  - Code changes should automatically flow through a pipeline that includes artifact creation, unit testing, functional testing, and production rollout.
+  - In some cases, you want a code update to apply to only a subset of your users, so that it is exercised realistically before you push it to your entire user base.
+  - If one of these [canary](https://martinfowler.com/bliki/CanaryRelease.html) releases proves unsatisfactory, your automated procedure must be able to quickly roll back the software changes.
+
+- Application delivery pipeline flow
+
+  1. Developer
+     1. Change code
+     2. Create a Git tag and push to repo
+  2. Container Builder
+     1. Detect new tag
+     2. Build docker image
+     3. Run unit tests
+     4. Push Docker image
+  3. Spinnaker
+     1. Detect new image
+     2. Deploy to canary
+     3. Functional tests of canary deployment
+     4. Manual approval
+     5. Deploy to production
+
+- Set up your environment
+
+  ```sh
+  gcloud config set compute/zone us-central1-f
+  ## cluster need 5~10 mins to be created
+  gcloud container clusters create spinnaker-tutorial \
+      --machine-type=n1-standard-2
+      
+  ## create a Spinnaker service account
+  gcloud iam service-accounts create spinnaker-account \
+      --display-name spinnaker-account
+  export SA_EMAIL=$(gcloud iam service-accounts list \
+      --filter="displayName:spinnaker-account" \
+      --format='value(email)')
+  export PROJECT=$(gcloud info --format='value(config.project)')
+  
+  ## allowing Spinnaker to store data in Cloud Storage. 
+  gcloud projects add-iam-policy-binding $PROJECT \
+      --role roles/storage.admin \
+      --member serviceAccount:$SA_EMAIL
+      
+  ## create key    
+  gcloud iam service-accounts keys create spinnaker-sa.json \
+       --iam-account $SA_EMAIL
+  ```
+
+- Set up Cloud Pub/Sub to trigger Spinnaker pipelines
+
+  ```sh
+  ## create the Cloud Pub/Sub topic for notifications from Container Registry.
+  gcloud pubsub topics create projects/$PROJECT/topics/gcr
+  
+  ## create a subscription that Spinnaker can read from to receive notifications of images being pushed.
+  gcloud pubsub subscriptions create gcr-triggers \
+      --topic projects/${PROJECT}/topics/gcr
+  
+  ## give Spinnaker permissions to read subscription
+  gcloud beta pubsub subscriptions add-iam-policy-binding gcr-triggers \
+      --role roles/pubsub.subscriber --member serviceAccount:$SA_EMAIL
+  ```
+
+- Deploying Spinnaker using Helm
+
+  ```sh
+  ## grant Helm the cluster-admin role
+  kubectl create clusterrolebinding user-admin-binding \
+      --clusterrole=cluster-admin --user=$(gcloud config get-value account)
+  ## grant Spinnaker the cluster-admin role
+  kubectl create clusterrolebinding --clusterrole=cluster-admin \
+      --serviceaccount=default:default spinnaker-admin
+  
+  ## add stable chrart to Helm's repo
+  helm repo add stable https://charts.helm.sh/stable
+  helm repo update
+  
+  ## create a bucket for Spinnaker to store its pipeline configuration
+  export BUCKET=$PROJECT-spinnaker-config
+  gsutil mb -c regional -l us-central1 gs://$BUCKET   
+  ```
+
+  ```SH
+  ## create spinnaker-config.yaml by run following code
+  export SA_JSON=$(cat spinnaker-sa.json)
+  cat > spinnaker-config.yaml <<EOF
+  gcs:
+    enabled: true
+    bucket: $BUCKET
+    project: $PROJECT
+    jsonKey: '$SA_JSON'
+  
+  dockerRegistries:
+  - name: gcr
+    address: https://gcr.io
+    username: _json_key
+    password: '$SA_JSON'
+    email: 1234@5678.com
+  
+  # Disable minio as the default storage backend
+  minio:
+    enabled: false
+  
+  # Configure Spinnaker to enable GCP services
+  halyard:
+    spinnakerVersion: 1.19.4
+    image:
+      repository: us-docker.pkg.dev/spinnaker-community/docker/halyard
+      tag: 1.32.0
+      pullSecrets: []
+    additionalScripts:
+      create: true
+      data:
+        enable_gcs_artifacts.sh: |-
+          \$HAL_COMMAND config artifact gcs account add gcs-$PROJECT --json-path /opt/gcs/key.json
+          \$HAL_COMMAND config artifact gcs enable
+        enable_pubsub_triggers.sh: |-
+          \$HAL_COMMAND config pubsub google enable
+          \$HAL_COMMAND config pubsub google subscription add gcr-triggers \
+            --subscription-name gcr-triggers \
+            --json-path /opt/gcs/key.json \
+            --project $PROJECT \
+            --message-format GCR
+  EOF
+  ```
+
+  ```SH
+  ## deploy the Spinnaker chart
+  helm install -n default cd stable/spinnaker -f spinnaker-config.yaml \
+             --version 2.0.0-rc9 --timeout 10m0s --wait
+  export DECK_POD=$(kubectl get pods --namespace default -l "cluster=spin-deck" -o jsonpath="{.items[0].metadata.name}")
+  
+  ## port forwarding
+  kubectl port-forward --namespace default $DECK_POD 8080:9000 >> /dev/null &
+  ```
+
+  - **Web Preview** > **Preview on port 8080**
+
+- Building the Docker image
+
+  ```sh
+  ## download the sample
+  gsutil -m cp -r gs://spls/gsp114/sample-app.tar .
+  mkdir sample-app
+  tar xvf sample-app.tar -C ./sample-app
+  cd sample-app
+  
+  ## git commit
+  git config --global user.email "$(gcloud config get-value core/account)"
+  git config --global user.name student
+  git init
+  git add .
+  git commit -m "Initial commit"
+  
+  ## create gcp remote repo and push
+  gcloud source repos create sample-app
+  git config credential.helper gcloud.sh
+  git remote add origin https://source.developers.google.com/p/$PROJECT/r/sample-app
+  git push origin master
+  ```
+
+  - **Navigation Menu** > **Source Repositories** > **sample.app**
+
+- Configure your cloud build triggers
+
+  - **Navigation menu** > **Cloud Build** > **Triggers** > **Create trigger**
+  - **Name**: sample-app-tags
+  - **Event**: Push new tag
+  - **Repository**: sample-app
+  - **Tag**: v1.*
+  - **Configuration**: Cloud Build configuration file (yaml or json)
+  - **Cloud Build configuration file location**: `/cloudbuild.yaml`
+  - CREATE
+
+- Prepare your Kubernetes Manifests for use in Spinnaker
+
+  ```SH
+  ## Creates a Cloud Storage bucket that will be populated with your manifests during the CI process in Cloud Build
+  gsutil mb -l us-central1 gs://$PROJECT-kubernetes-manifests
+  sed -i s/PROJECT/$PROJECT/g k8s/deployments/*
+  git commit -a -m "Set project ID"
+  ```
+
+- Build image
+
+  ```sh
+  git tag v1.0.0git push --tags
+  ```
+
+  - **Navigation menu** > **Cloud Build** > **History**
+  - Stay on this page and wait  green check
+
+- Configuring your deployment pipelines
+
+  ```sh
+  ## download spin CLI for managing Spinnaker
+  curl -LO https://storage.googleapis.com/spinnaker-artifacts/spin/1.14.0/linux/amd64/spin
+  chmod +x spin
+  
+  ## create the application
+  ./spin application save --application-name sample \
+                          --owner-email "$(gcloud config get-value core/account)" \
+                          --cloud-providers kubernetes \
+                          --gate-endpoint http://localhost:8080/gate
+                          
+  ## upload an example pipleline
+  sed s/PROJECT/$PROJECT/g spinnaker/pipeline-deploy.json > pipeline.json
+  ./spin pipeline save --gate-endpoint http://localhost:8080/gate -f pipeline.json
+  ```
+
+- Manually Trigger and View your pipeline execution
+
+  - **Spinnaker UI** > **Applications** > **sample** > **Pipelines** > **Start Manual Execution**> **Run**
+  - **Execution Details** > Click a stage to see details about it
+  - After **3 to 5 minutes** the integration test phase completes and the pipeline requires manual approval to continue the deployment.
+  - Hover over the yellow "person" icon and click **Continue**.
+  - **Infrastructure** > **Load Balancers** > **service sample-frontend-production Default**
+  - copy **Ingress** IP and paste it to new tab
+  - Refresh many times, you will see production version and canary version(4:1)
+
+- Triggering your pipeline from code changes
+
+  ```SH
+  ## change color from orange to blue
+  sed -i 's/orange/blue/g' cmd/gke-info/common-service.go
+  git commit -a -m "Change color to blue"
+  git tag v1.0.1
+  git push --tags
+  ```
+
+  - **Navigation menu** > **Cloud Build** > **History**
+  - Stay on this page and wait  green check
+  - **Spinnaker UI** > **Applications** > **sample** > **Pipelines**
+  - When the deployment is paused, waiting to roll out to production, return to the web app page and start refreshing the tab.
+  - You should see the new, blue version(**Canary**) of your app appear about every fifth time you refresh.
+  - **Continue** the deployment.
+  - When the pipeline completes, all versions will show blue background
+
+- Rollback
+
+  ```sh
+  git revert v1.0.1
+  git tag v1.0.2
+  git push --tags
+  ```
+
+  - When the build and then the pipeline completes, all versions will show orange background
