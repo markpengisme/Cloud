@@ -493,3 +493,199 @@
   ```
 
   ==Shelve this class, cause i do not have RDP software==
+
+## Deploying Memcached on Kubernetes Engine
+
+- In this lab you'll learn how to deploy a cluster of distributed [Memcached](https://memcached.org/) servers on [Kubernetes Engine](https://cloud.google.com/kubernetes-engine/) using [Kubernetes](https://kubernetes.io/), [Helm](https://helm.sh/), and [Mcrouter](https://github.com/facebook/mcrouter).
+
+- Memcached is one of the most popular open source, multi-purpose caching systems. It usually serves as a temporary store for frequently used data to speed up web applications and lighten database loads.
+
+  - **Simplicity**: like a large hash table
+  - **Speed**: holds cache data  in RAM
+
+- Memcached is a distributed system that allows its hash table capacity to scale horizontally across a pool of servers. The routing and load balancing between the servers must be done at the client level.
+
+  - The same server is always selected for the same key.
+  - Memory usage is evenly balanced between the servers.
+  - A minimum number of keys are relocated when the pool of servers is reduced or expanded.
+
+- Deploying a Memcached service
+
+  ```sh
+  ## 3 nodes gke cluster
+  gcloud container clusters create demo-cluster --num-nodes 3 --zone us-central1-f
+  
+  ## configure helm
+  helm repo add stable https://charts.helm.sh/stable
+  helm repo update
+  
+  ## deploy mycache memcached helm chart
+  helm install mycache stable/memcached --set replicaCount=3
+  kubectl get pods
+  ```
+
+- Discovering Memcached service endpoints
+
+  - Memcached Helm chart uses a headless service. A headless service exposes IP addresses for all of its pods so that they can be individually discovered
+  - DNS record: mycache-memcached.default.svc.cluster.local(`[SERVICE_NAME].[NAMESPACE].svc.cluster.local`)
+
+  ```sh
+  ## Retrieve the endpoints' IP addresses:
+  kubectl get endpoints mycache-memcached
+  
+  ## Anothe way, use nslookup
+  kubectl run -it --rm alpine --image=alpine:3.6 --restart=Never nslookup mycache-memcached.default.svc.cluster.local
+  # [POD_NAME].[SERVICE_NAME].[NAMESPACE].svc.cluster.local
+  
+  ## Another way, use python
+  >>> import socket
+  >>> print(socket.gethostbyname_ex('mycache-memcached.default.svc.cluster.local'))
+  >>> exit()
+  ```
+
+  - Test the deployment by opening a telnet session
+
+  ```sh
+  ## telnet
+  kubectl run -it --rm alpine --image=alpine:3.6 --restart=Never telnet mycache-memcached-0.mycache-memcached.default.svc.cluster.local 11211
+  
+  ## test
+  
+  # set key compress expiration length
+  set mykey 0 0 5
+  # value
+  hello
+  # get key
+  get mykey
+  
+  quit
+  ```
+
+- Implementing the service discovery logic
+
+  - ![!mg](https://cdn.qwiklabs.com/sc0rg%2BcEvqxI8%2BojmPOzhOnlLCCrsw%2F8YxhMAZsmlgw%3D)
+    1. The application queries `kube-dns` for the DNS record of `mycache-memcached.default.svc.cluster.local`.
+    2. The application retrieves the IP addresses associated with that record.
+    3. The application instantiates a new Memcached client and provides it with the retrieved IP addresses.
+    4. The Memcached client's integrated load balancer connects to the Memcached servers at the given IP addresses.
+
+  ```sh
+  ## using pythonkubectl run -it --rm python --image=python:3.6-alpine --restart=Never shpip install pymemcachepython
+  ```
+
+  ```python
+  import socket
+  from pymemcache.client.hash import HashClient
+  
+  ## 1
+  _, _, ips = socket.gethostbyname_ex('mycache-memcached.default.svc.cluster.local')
+  ## 2
+  servers = [(ip, 11211) for ip in ips]
+  ## 3
+  client = HashClient(servers, use_pooling=True)
+  ## 4
+  client.set('mykey', 'hello')
+  client.get('mykey')
+  ```
+
+- Enabling connection pooling using Mcrouter
+
+  - In particular, As your caching needs grow, the large number of open connections from Memcached clients might place a heavy load on the servers.
+  - To reduce the number of open connections, you must introduce a proxy to enable connection pooling
+  - ![img](https://cdn.qwiklabs.com/McgEiSHBkoDtEpmtZ30aUFD2s%2Fwf1v9vsdIAo%2FRWyY8%3D)
+  - [Mcrouter](https://github.com/facebook/mcrouter) (pronounced "mick router"), a powerful open source Memcached proxy, enables connection pooling.
+
+  ```sh
+  ## delete mycache helm chart
+  helm delete mycache
+  ## deploy new memcached and mcrouter using mcrouter helm chart
+  helm install mycache stable/mcrouter --set memcached.replicaCount=3
+  ```
+
+  ```sh
+  ## test connect: telnet
+  MCROUTER_POD_IP=$(kubectl get pods -l app=mycache-mcrouter -o jsonpath="{.items[0].status.podIP}")
+  kubectl run -it --rm alpine --image=alpine:3.6 --restart=Never telnet $MCROUTER_POD_IP 5000
+  
+  ## cmd
+  set anotherkey 0 0 15
+  Mcrouter is fun
+  get anotherkey
+  quit
+  ```
+
+- Reducing latency
+
+  - To increase resilience, it is common practice to use a cluster with multiple nodes. However, using multiple nodes also brings the risk of increased latency caused by heavier network traffic between nodes.
+
+  - You can reduce the latency risk by connecting client application pods only to a Memcached proxy pod that is on the same node.
+
+  - ![Colocating proxy pods](https://cdn.qwiklabs.com/lrOApI5zGzaauVVZg07ahgD0os8kXUYS7dPaDO6TzTI%3D)
+
+  - In a production environment, you would create this configuration as follows:
+
+    1. Ensure that each node contains one running proxy pod.A common approach is to deploy the proxy pods with a [DaemonSet controller](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset).(Mcrouter Helm chart did it)
+
+    2. Set a [hostPort](https://v1-7.docs.kubernetes.io/docs/api-reference/v1.7/#containerport-v1-core) value in the proxy container's Kubernetes parameters to make the node listen to that port and redirect traffic to the proxy.(Mcrouter Helm chart did it for `port 5000`)
+
+    3. Expose the node name as an environment variable inside the application pods by using the `spec.env` entry and selecting the `spec.nodeName` `fieldRef` value.
+
+       ```sh
+       cat <<EOF | kubectl create -f -
+       apiVersion: apps/v1
+       kind: Deployment
+       metadata:
+         name: sample-application-py
+       spec:
+         replicas: 5
+         selector:
+           matchLabels:
+             app: sample-application-py
+         template:
+           metadata:
+             labels:
+               app: sample-application-py
+           spec:
+             containers:
+               - name: python
+                 image: python:3.6-alpine
+                 command: [ "sh", "-c"]
+                 args:
+                 - while true; do sleep 10; done;
+                 env:
+                   - name: NODE_NAME
+                     valueFrom:
+                       fieldRef:
+                         fieldPath: spec.nodeName
+       EOF
+       ```
+
+  - Connecting the pods
+
+    ```sh
+    POD=$(kubectl get pods -l app=sample-application-py -o jsonpath="{.items[0].metadata.name}")
+    NODE_NAME=$(kubectl exec -it $POD -- sh -c 'echo $NODE_NAME' | tr -d '\r')
+    
+    ## use telnet
+    kubectl run -it --rm alpine --image=alpine:3.6 --restart=Never telnet $NODE_NAME 5000
+    get anotherkey
+    quit
+    
+    ## use python
+    kubectl exec -it $POD -- sh
+    pip install pymemcache
+    python
+    ```
+
+    ```python
+    import os
+    from pymemcache.client.base import Client
+    
+    NODE_NAME = os.environ['NODE_NAME']
+    client = Client((NODE_NAME, 5000))
+    client.set('some_key', 'some_value')
+    result = client.get('some_key')
+    result
+    result = client.get('anotherkey')
+    result
+    ```
