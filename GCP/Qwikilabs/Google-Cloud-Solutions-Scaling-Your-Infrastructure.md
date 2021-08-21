@@ -689,3 +689,199 @@
     result = client.get('anotherkey')
     result
     ```
+
+## Running Dedicated Game Servers(DGS) in Google Kubernetes Engine
+
+- This lab will show you how to use an expandable architecture for running a [real-time, session-based multiplayer dedicated game server](https://cloud.google.com/solutions/gaming/cloud-game-infrastructure#dedicated_game_server) using [Kubernetes](http://kubernetes.io/)on [Google Kubernetes Engine](https://cloud.google.com/container-engine/).
+
+- Containerizing the dedicated game server
+
+  - **Compute Engine** > **VM Instances** > **CREATE INSTANCE**
+
+    - Identity and API access: Allow full access to all Cloud APIs
+    - Create
+    - SSH
+
+  - Install kubectl and docker on your VM
+
+    ```sh
+    sudo apt-get update
+    sudo apt-get -y install kubectl
+    
+    ## install dependencies
+    sudo apt-get -y install \
+         apt-transport-https \
+         ca-certificates \
+         curl \
+         gnupg2 \
+         software-properties-common
+    
+    ## add GPG key -> add docker apt-repo -> install docker-ce
+    curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | sudo apt-key add -
+    sudo apt-key fingerprint 0EBFCD88
+    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")    $(lsb_release -cs) stable"
+    sudo apt-get update
+    sudo apt-get -y install docker-ce
+    
+    ## non-root user:
+    sudo usermod -aG docker $USER
+    
+    ## SSH again
+    docker run hello-world
+    
+    ## download the sample game server demo
+    gsutil -m cp -r gs://spls/gsp133/gke-dedicated-game-server .
+    ```
+
+  - Generate a dgs container image
+
+    ```sh
+    ## env
+    export GCR_REGION=us PROJECT_ID=$(gcloud config get-value project)
+    printf "$GCR_REGION \n$PROJECT_ID\n"
+    
+    ## build and push to gcr(Google Container Registry)
+    cd gke-dedicated-game-server/openarena
+    docker build -t ${GCR_REGION}.gcr.io/${PROJECT_ID}/openarena:0.8.8 .
+    gcloud docker -- push ${GCR_REGION}.gcr.io/${PROJECT_ID}/openarena:0.8.8
+    ```
+
+  - Generate an assets disk
+
+    ```sh
+    export region=us-east1
+    export zone_1=${region}-b
+    gcloud config set compute/region ${region}
+    
+    ## create and attach an appropriately-sized persistent disk.
+    gcloud compute instances create openarena-asset-builder \
+       --machine-type f1-micro \
+       --image-family debian-9 \
+       --image-project debian-cloud \
+       --zone ${zone_1}
+    gcloud compute disks create openarena-assets \
+       --size=50GB --type=pd-ssd\
+       --description="OpenArena data disk. Mount read-only at /usr/share/games/openarena/baseoa/" \
+       --zone ${zone_1}
+    gcloud compute instances attach-disk openarena-asset-builder \
+       --disk openarena-assets --zone ${zone_1}
+    ```
+
+- Format and Configure the Assets Disk
+
+  - **Compute Engine** > **VM Instances** > **openarena-asset-builder** > **SSH**
+
+  ```sh
+  ## check sda 10GB(OS)/ sdb 50GB(openarena-assets )
+  sudo lsblk
+  
+  ## format openarena-assets 
+  sudo mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/sdb
+  
+  ## mount and install openarena-server
+  sudo mkdir -p /usr/share/games/openarena/baseoa/
+  sudo mount -o discard,defaults /dev/sdb \
+      /usr/share/games/openarena/baseoa/
+  sudo apt-get update
+  sudo apt-get -y install openarena-server
+  
+  sudo gsutil cp gs://qwiklabs-assets/single-match.cfg /usr/share/games/openarena/baseoa/single-match.cfg
+  
+  ## unmount and shutdown
+  sudo umount -f -l /usr/share/games/openarena/baseoa/
+  sudo shutdown -h now
+  ```
+
+  - Delete **openarena-asset-builder** VM
+  - The persistent disk is ready to be used as a `persistentVolume` in Kubernetes and the instance can be safely deleted.
+
+- Setting up a Kubernetes cluster
+
+  ```sh
+  ## create network and cluster
+  gcloud compute networks create game
+  gcloud compute firewall-rules create openarena-dgs --network game \
+      --allow udp:27961-28061
+  gcloud container clusters create openarena-cluster \
+     --num-nodes 3 \
+     --network game \
+     --machine-type=n1-standard-2 \
+     --zone=${zone_1}
+  gcloud container clusters get-credentials openarena-cluster --zone ${zone_1}
+  
+  ## configuring the assets disk in Kubernetes
+  kubectl apply -f k8s/asset-volume.yaml
+  kubectl apply -f k8s/asset-volumeclaim.yaml
+  kubectl get persistentVolume
+  kubectl get persistentVolumeClaim
+  ```
+
+- Configuring the DGS pod:`k8s/oarena_pod.yaml`
+
+- Setting up the scaling manager
+
+  - The scaling manager is a simple process that scales the number of virtual machines used as Container Engine nodes based on the current DGS load.
+
+  ```sh
+  ## build and push the configuration
+  cd ../scaling-manager
+  chmod +x build-and-push.sh
+  source ./build-and-push.sh
+  ```
+
+- Configure the Openarena Scaling Manager Deployment File
+
+  ```sh
+  export GKE_BASE_INSTANCE_NAME=$(gcloud compute instance-groups managed list | awk 'NR==2{ print $4}')
+  export GCP_ZONE=us-east1-b
+  printf "$GCR_REGION \n$PROJECT_ID \n$GKE_BASE_INSTANCE_NAME \n$GCP_ZONE \n"
+  
+  sed -i "s/\[GCR_REGION\]/$GCR_REGION/g" k8s/openarena-scaling-manager-deployment.yaml
+  sed -i "s/\[PROJECT_ID\]/$PROJECT_ID/g" k8s/openarena-scaling-manager-deployment.yaml
+  sed -i "s/\[ZONE\]/$GCP_ZONE/g" k8s/openarena-scaling-manager-deployment.yaml
+  sed -i "s/\gke-openarena-cluster-default-pool-\[REPLACE_ME\]/$GKE_BASE_INSTANCE_NAME/g" k8s/openarena-scaling-manager-deployment.yaml
+  
+  kubectl apply -f k8s/openarena-scaling-manager-deployment.yaml
+  kubectl get pods
+  # Wait until you see this report 3/3 nodes ready.
+  ```
+
+- Testnig the setup
+
+  ```sh
+  ## Requesting a new DGS instance
+  cd ..
+  sed -i "s/\[GCR_REGION\]/$GCR_REGION/g" openarena/k8s/openarena-pod.yaml
+  sed -i "s/\[PROJECT_ID\]/$PROJECT_ID/g" openarena/k8s/openarena-pod.yaml
+  kubectl apply -f openarena/k8s/openarena-pod.yaml
+  kubectl get pods
+  ```
+
+  ```sh
+  ## if error, change mount locationg, and recreate pod
+  kubectl delete pod openarena.dgs
+  sed -i "s/\/usr\/share\/games\/openarena\/baseoa/\/usr\/lib\/openarena-server\/baseoa/g"  openarena/k8s/openarena-pod.yaml
+  kubectl apply -f openarena/k8s/openarena-pod.yaml
+  ```
+
+- Connecting to the DGS
+
+  - Launch the OpenArena client on your own computer once the [game has been installed](http://openarena.wikia.com/wiki/Manual/Install).
+  
+  ```sh
+  export NODE_NAME=$(kubectl get pod openarena.dgs \
+      -o jsonpath="{.spec.nodeName}")
+  export DGS_IP=$(gcloud compute instances list \
+      --filter="name=( ${NODE_NAME} )" \
+      --format='table[no-heading](EXTERNAL_IP)')
+  
+  printf "Node Name: $NODE_NAME \nNode IP  : $DGS_IP \nPort         : 27961\n"
+  ```
+  
+- Testing the scaling manager
+
+  - Since the scaling manager scales the number of VM instances in the Kubernetes cluster based on the number of DGS pods
+  - For testing purposes, a script is provided in the solutions repository which adds four DGS pods per minute for 5 minutes:
+
+  - `source ./scaling-manager/tests/test-loader.sh`
+
