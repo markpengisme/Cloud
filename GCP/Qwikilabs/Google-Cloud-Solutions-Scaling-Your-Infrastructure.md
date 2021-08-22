@@ -885,3 +885,90 @@
 
   - `source ./scaling-manager/tests/test-loader.sh`
 
+## Distributed Load Testing Using Kubernetes
+
+- Overview
+
+  - In this lab you will learn how to use **Google Kubernetes Engine** to deploy a distributed load testing framework. The framework uses multiple containers to create load testing traffic for a simple REST-based API.
+  - System under test: For this lab the system under test is a small web application deployed to **Google App Engine**.
+  - Example workloads: The application that you'll deploy is modeled after the backend service component found in many Internet-of-Things (IoT) deployments.
+  - To model this interaction, you'll use **Locust**, a distributed, Python-based load testing tool that is capable of distributing requests across multiple target paths.
+
+- Set project and zone
+
+  ```sh
+  PROJECT=$(gcloud config get-value project)
+  REGION=us-central1
+  ZONE=${REGION}-a
+  CLUSTER=gke-load-test
+  TARGET=${PROJECT}.appspot.com
+  gcloud config set compute/region $REGION
+  gcloud config set compute/zone $ZONE
+  ```
+
+- Get the sample code and build a Docker image for the application
+
+  ```sh
+  gsutil -m cp -r gs://spls/gsp182/distributed-load-testing-using-kubernetes .
+  cd distributed-load-testing-using-kubernetes/
+  gcloud builds submit --tag gcr.io/$PROJECT/locust-tasks:latest docker-image/.
+  ```
+
+- Deploy Google App Engine Python Web Application
+
+  ```sh
+  gcloud app deploy sample-webapp/app.yaml
+  # region [17]
+  ```
+
+- Deploy Kubernetes Cluster
+
+  ```sh
+  gcloud container clusters create $CLUSTER \
+    --zone $ZONE \
+    --num-nodes=5
+  ```
+
+- Load testing master
+
+  - The first component of the deployment is the Locust master, which is the entry point for executing the load testing tasks described above.
+    - replica=1
+    - `8089` for web interface
+    - `5557` & `5558` for communicating with workers
+
+  ```sh
+  sed -i -e "s/\[TARGET_HOST\]/$TARGET/g" kubernetes-config/locust-master-controller.yaml
+  sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" kubernetes-config/locust-master-controller.yaml
+  kubectl apply -f kubernetes-config/locust-master-controller.yaml
+  kubectl get pods -l app=locust-master
+  kubectl apply -f kubernetes-config/locust-master-service.yaml
+  kubectl get svc locust-master
+
+- Load testing workers
+
+  - The next component of the deployment includes the Locust workers, which execute the load testing tasks described above.
+    - LOCUST_MASTER
+    - TARGET_HOST
+
+  ```sh
+  sed -i -e "s/\[TARGET_HOST\]/$TARGET/g" kubernetes-config/locust-worker-controller.yaml
+  sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" kubernetes-config/locust-worker-controller.yaml
+  kubectl apply -f kubernetes-config/locust-worker-controller.yaml
+  kubectl get pods -l app=locust-worker
+  
+  ## scales up to 20 pods
+  kubectl scale deployment/locust-worker --replicas=20
+  kubectl get pods -l app=locust-worker
+  ```
+
+- Execute Tests
+
+  ```sh
+  EXTERNAL_IP=$(kubectl get svc locust-master -o yaml | grep ip | awk -F": " '{print $NF}')
+  echo http://$EXTERNAL_IP:8089
+  ```
+
+  - Click the link and navigate to Locust master web interface.
+  - Specify number of users as **300** and rate as **10**.
+  - Click **Start swarming**.
+  - As time progress and users are spawned, you will see statistics begin to aggregate for simulation metrics, such as the number of requests and requests per second(RPS).
