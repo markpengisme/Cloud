@@ -43,3 +43,9 @@
   - Deploying Memcached on Kubernetes Engine
   - Running Dedicated Game Servers(DGS) in Google Kubernetes Engine
   - Distributed Load Testing Using Kubernetes
+- [Google Cloud Solutions II: Data and Machine Learning](./Google-Cloud-Solutions-Data-and-Machine-Learning)
+  - Exploring NCAA Data with BigQuery
+  - TensorFlow for Poets
+  - Creating an Object Detection Application Using TensorFlow
+  - Using OpenTSDB to Monitor Time-Series Data on Cloud Platform
+  - Scanning User-generated Content Using the Cloud Video Intelligence and Cloud Vision APIs
