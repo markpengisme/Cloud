@@ -274,3 +274,99 @@
   - Use small learning_rate(`--learning_rate=0.5`) on scripts.retrain
   - Use your images (`--image_dir`) on scripts.retrain
     - Each sub-folder is named after one of your categories and contains only images from that category
+
+## Creating an Object Detection Application Using TensorFlow
+
+- This lab will show you how to install and run an object detection application. The application uses **TensorFlow2** and [Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection) libraries to detect multiple objects in an uploaded image.
+
+- Pre-trained models: [the COCO dataset](http://mscoco.org/) are capable of detecting general objects in 80 categories.(Higher COCO mAP indicate better accuracy)
+
+  | Pre-trained model name                                       | Speed  | COCO mAP |
+  | ------------------------------------------------------------ | ------ | -------- |
+  | [ssd_mobilenet_v1_coco](http://download.tensorflow.org/models/object_detection/ssd_mobilenet_v1_coco_11_06_2017.tar.gz) | fast   | 21       |
+  | [ssd_inception_v2_coco](http://download.tensorflow.org/models/object_detection/ssd_inception_v2_coco_11_06_2017.tar.gz) | fast   | 24       |
+  | [rfcn_resnet101_coco](http://download.tensorflow.org/models/object_detection/rfcn_resnet101_coco_11_06_2017.tar.gz) | medium | 30       |
+  | [faster_rcnn_resnet101_coco](http://download.tensorflow.org/models/object_detection/faster_rcnn_resnet101_coco_11_06_2017.tar.gz) | medium | 32       |
+  | [faster_rcnn_inception_resnet_v2_atrous_coco](http://download.tensorflow.org/models/object_detection/faster_rcnn_inception_resnet_v2_atrous_coco_11_06_2017.tar.gz) | slow   | 37       |
+
+- Launch a VM instance
+
+  - **Navigation menu** > **Compute Engine** > **VM Instances**  > **Create Instance**
+  - **Machine type**: Custom(4,16)
+  - **Firewall:** Allow HTTP traffic
+  - **Networking**: Click default > **External IP** > **Create IP address** > Name:staticip > **Reserve**
+  - Create
+
+- SSH into the instance
+
+  ```sh
+  sudo -i
+  
+  ## Install the python flask tensorflow
+  apt-get update
+  apt-get install -y protobuf-compiler python3-pil python3-lxml python3-pip python3-dev git
+  
+  pip3 install --upgrade pip
+  pip3 install Flask==1.1.1 WTForms==2.2.1 Flask_WTF==0.14.2 Werkzeug==0.16.0
+  pip3 install tensorflow
+  
+  ## Install the Object Detection API library:
+  cd /opt
+  git clone https://github.com/tensorflow/models
+  cd models/research
+  protoc object_detection/protos/*.proto --python_out=.
+  
+  ## Download the pre-trained model binaries
+  mkdir -p /opt/graph_def
+  cd /tmp
+  for model in \
+    ssd_mobilenet_v1_coco_11_06_2017 \
+    ssd_inception_v2_coco_11_06_2017 \
+    rfcn_resnet101_coco_11_06_2017 \
+    faster_rcnn_resnet101_coco_11_06_2017 \
+    faster_rcnn_inception_resnet_v2_atrous_coco_11_06_2017
+  do \
+    curl -OL http://download.tensorflow.org/models/object_detection/$model.tar.gz
+    tar -xzf $model.tar.gz $model/frozen_inference_graph.pb
+    cp -a $model /opt/graph_def/
+  done
+  
+  ## choose a model(faster_rcnn_resnet101_coco_11_06_2017) for the web application
+  ln -sf /opt/graph_def/faster_rcnn_resnet101_coco_11_06_2017/frozen_inference_graph.pb /opt/graph_def/frozen_inference_graph.pb
+  ```
+
+- Install and launch the web application
+
+  ```sh
+  cd $HOME
+  git clone https://github.com/GoogleCloudPlatform/tensorflow-object-detection-example
+  ## app
+  cp -a tensorflow-object-detection-example/object_detection_app_p3 /opt/
+  chmod u+x /opt/object_detection_app_p3/app.py
+  ## service
+  cp /opt/object_detection_app_p3/object-detection.service /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable object-detection
+  systemctl start object-detection
+  systemctl status object-detection
+  ```
+
+- Test the web application
+
+  - <http://[instance1_External_IP]:6006>
+  - Username - `username`
+  - Password - `passw0rd`
+  - **Choose File** > **Upload** > wait 30 seconds to shows the result
+  - The object names detected by the model are shown to the right of the image, in the application window.
+  - Click an object name to display rectangles surrounding the corresponding objects in the image.
+  - The rectangle thickness increases with object identification confidence.
+
+- Change the inference model
+
+  ```sh
+  systemctl stop object-detection
+  MODEL_NAME=faster_rcnn_inception_resnet_v2_atrous_coco_11_06_2017
+  ln -sf /opt/graph_def/${MODEL_NAME}/frozen_inference_graph.pb /opt/graph_def/frozen_inference_graph.pb
+  systemctl start object-detection
+  systemctl status object-detection
+  ```
