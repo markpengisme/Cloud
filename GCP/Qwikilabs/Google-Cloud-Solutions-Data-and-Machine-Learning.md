@@ -370,3 +370,167 @@
   systemctl start object-detection
   systemctl status object-detection
   ```
+
+## Using OpenTSDB to Monitor Time-Series Data on Cloud Platform
+
+- In this lab you will learn how to collect, record, and monitor [time-series data](https://en.wikipedia.org/wiki/Time_series) on Google Cloud using [OpenTSDB](http://opentsdb.net/) running on [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/) and [Cloud Bigtable](https://cloud.google.com/bigtable/).
+
+- ![acrh](https://cdn.qwiklabs.com/vznMSp6IhoJb8VHlaCkNY39HtTClU6GW829ZzeHx7rg%3D)
+
+- Preparing your environment
+
+  ```sh
+  gcloud config set compute/zone us-central1-f
+  git clone https://github.com/GoogleCloudPlatform/opentsdb-bigtable.git
+  cd opentsdb-bigtable
+  ```
+
+- Creating a Bigtable instance
+
+  - Bigtable is a key/wide-column store that works especially well for time-series data, explained in [Bigtable Schema Design for Time Series Data](https://cloud.google.com/bigtable/docs/schema-design-time-series).
+  - The ability to easily scale to meet your needs is a key feature of Bigtable.([ref](https://cloud.google.com/bigtable/docs/performance))
+  - Bigtable supports the HBase API, which makes it easy for you to use software designed to work with [Apache HBase](https://hbase.apache.org/), such as OpenTSDB([ref](http://opentsdb.net/docs/build/html/user_guide/backends/hbase.html)).
+  - A key component of OpenTSDB is the [AsyncHBase](https://github.com/OpenTSDB/asynchbase) client, which enables it to bulk-write to HBase in a fully asynchronous, non-blocking, thread-safe manner. When you use OpenTSDB with Bigtable, AsyncHBase is implemented as the [AsyncBigtable](https://github.com/OpenTSDB/asyncbigtable) client.
+  - **Navigation menu** > **Bigtable** > **Create Instance**
+    - Instance name: OpenTSDB
+    - region: us-central1
+    - zone: us-central1f
+    - Create
+
+- Creating a Kubernetes Engine cluster
+
+  - OpenTSDB separates its storage from its application layer, which enables it to be deployed across multiple instances simultaneously. By running in parallel, it can handle a large amount of time-series data. Packaging OpenTSDB into a Docker container enables easy deployment at scale using Kubernetes Engine.
+
+  ```sh
+  gcloud container clusters create opentsdb-cluster \
+  --no-enable-autoupgrade \
+  --no-enable-ip-alias --no-enable-basic-auth \
+  --no-issue-client-certificate \
+  --metadata disable-legacy-endpoints=true \
+  --scopes "https://www.googleapis.com/auth/bigtable.admin","https://www.googleapis.com/auth/bigtable.data"
+  ```
+
+- Creating a ConfigMap with configuration details
+
+  - The configuration for OpenTSDB is specified in `opentsdb.conf`
+
+  - Kubernetes provides a mechanism called the [ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/) to separate configuration details from the container image to make applications more portable.(decoupled)
+
+  - **Open Editor** > **configmaps** > **opentsdb-config.yaml** > Replace the placeholder text
+
+    - REPLACE_WITH_PROJECT: `$Project_ID`
+    - REPLACE_WITH_INSTANCE: opentsdb
+    - REPLACE_WITH_ZONE: us-central1-f
+    - Save
+
+  - Create
+
+    ```sh
+    kubectl create -f configmaps/opentsdb-config.yaml
+    ```
+
+    - Ref. other [configuration](http://opentsdb.net/docs/build/html/user_guide/configuration.html)options & [apply](https://kubernetes.io/docs/concepts/cluster-administration/manage-deployment/#kubectl-apply) ConfigMap
+
+- Creating OpenTSDB tables in Bigtable
+
+  > Bigtable automatically performs [data compression](https://cloud.google.com/bigtable/docs/overview#data_compression), so it disables user-configurable compression at an HBase level.
+
+  ```sh
+  ## create the necessary tables in Bigtable to store that data
+  # Ref.http://opentsdb.net/docs/build/html/installation.html#create-tables
+  kubectl create -f jobs/opentsdb-init.yaml
+  ## check done: Pods Statuses: 1 SUCCEEDED
+  kubectl describe jobs
+  
+  pods=$(kubectl get pods --selector=job-name=opentsdb-init \
+  --output=jsonpath={.items..metadata.name})
+  kubectl logs $pods
+  ```
+
+  - Data Model(The tables you just created will store data points from OpenTSDB)
+
+    | Field       | Required                     | Description                                     | Example                         |
+    | ----------- | ---------------------------- | ----------------------------------------------- | ------------------------------- |
+    | `metric`    | Required                     | Item that is being measured - the default key   | `sys.cpu.user`                  |
+    | `timestamp` | Required                     | Epoch time of the measurement                   | `1497561091`                    |
+    | `value`     | Required                     | Measurement value                               | `89.3`                          |
+    | `tags`      | At least one tag is required | Qualifies the measurement for querying purposes | `hostname=www``cpu=0``env=prod` |
+
+- Deploying OpenTSDB with K8s
+
+  - Deploy 2 deployment each with 3 pods and 2 services
+
+  > In a production deployment, you can increase the number of `tsd` pods running manually or by using [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/) in Kubernetes. Similarly, you can increase the number of instances in your Kubernetes Engine cluster manually or by using [Cluster Autoscaler](https://cloud.google.com/kubernetes-engine/docs/cluster-autoscaler).
+
+  ```sh
+  ## Create a deployment for writing metrics
+  kubectl create -f deployments/opentsdb-write.yaml
+  
+  ## Create a deployment for reading metrics
+  kubectl create -f deployments/opentsdb-read.yaml
+  
+  ## Create the service for writing metrics
+  kubectl create -f services/opentsdb-write.yaml
+  
+  ## Create the service for reading metrics
+  kubectl create -f services/opentsdb-read.yaml
+  
+  ## Check 6 pods
+  kubectl get pods
+  
+  ## Check 2 services
+  # This service is created inside your Kubernetes cluster and is accessible to other services running in your cluster.
+  kubectl get services
+  ```
+
+- Writing time-series data to OpenTSDB using [Heapster](https://github.com/kubernetes/heapster)(deprecated)
+
+  ```sh
+  ## Create ClusterRoleBinding configuration for heapster
+  vim rbac.yaml
+  ```
+
+  ```yaml
+  kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: heapster
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:heapster
+  subjects:
+  - kind: ServiceAccount
+    name: heapster-opentsdb
+    namespace: default
+  ```
+
+  Fix bug(Kubelet&403) method:==<https://blog.51cto.com/pizibaidu/2369489>==
+
+  ```sh
+  kubectl apply -f rbac.yaml
+  kubectl create -f deployments/heapster.yaml
+  ## check eapster-opentsdb is ready 1/1
+  kubectl get deployments
+  ```
+
+- Examining time-series data with OpenTSDB
+
+  - You can query time-series metrics by using the `opentsdb-read` service endpoint that you deployed earlier.
+  - In the lab, uses [Grafana](https://grafana.com/), a popular alternative for visualizing metrics that provides additional functionality.
+
+  ```sh
+  ## Set up Grafana
+  # configmap -> deployments -> port forwarding
+  kubectl create -f configmaps/grafana.yaml
+  kubectl create -f deployments/grafana.yaml
+  kubectl get deployments
+  grafana=$(kubectl get pods --selector=app=grafana \
+    --output=jsonpath={.items..metadata.name})
+  kubectl port-forward $grafana 8080:3000
+  ```
+
+  - **Web Preview** > **Preview on port 8080**
+
+    > A deployment of Grafana in a production environment would implement the proper authentication mechanisms and use richer time-series graphs.
+
