@@ -534,3 +534,145 @@
 
     > A deployment of Grafana in a production environment would implement the proper authentication mechanisms and use richer time-series graphs.
 
+## Scanning User-generated Content Using the Cloud Video Intelligence and Cloud Vision APIs
+
+- This lab will show you how to deploy a set of [Cloud Functions](https://cloud.google.com/functions/docs/) in order to process images and videos with the [Cloud Vision API](https://cloud.google.com/vision/docs/) and [Cloud Video Intelligence API](https://cloud.google.com/video-intelligence/docs/).
+
+- The Cloud Video Intelligence and Cloud Vision APIs offer you a scalable and serverless way to implement intelligent image and video filtering, accelerating submission processing
+
+- This lab use the safe-search feature in the Vision API and the explicit content detection feature in the Video Intelligence API, you can eliminate images and videos that are identified as unsafe or undesirable content before further processing.
+
+- ![arch](https://cdn.qwiklabs.com/F%2Bjs06t3HuOCj44qnIRbLW6rnMlAdB%2Fchedbbze6W4U%3D)
+
+- Initializing your Environment
+
+  - Cloud Storage buckets provide a storage location for uploading your images and videos. Now you will create four different Cloud Storage buckets.
+  - Cloud Pub/Sub topics is used for Cloud Storage notification messages and for messages between your Cloud Functions.
+  - Create a notification that is triggered only when one of your new objects is placed in the Cloud Storage file upload bucket
+  - The results of the Vision and Video Intelligence APIs are stored in BigQuery.
+
+  ```sh
+  export PROJECT_ID=$(gcloud info --format='value(config.project)')
+  export IV_BUCKET_NAME=${PROJECT_ID}-upload
+  export FILTERED_BUCKET_NAME=${PROJECT_ID}-filtered
+  export FLAGGED_BUCKET_NAME=${PROJECT_ID}-flagged
+  export STAGING_BUCKET_NAME=${PROJECT_ID}-staging
+  
+  ## Creating Cloud Storage buckets
+  gsutil mb gs://${IV_BUCKET_NAME}
+  gsutil mb gs://${FILTERED_BUCKET_NAME}
+  gsutil mb gs://${FLAGGED_BUCKET_NAME}
+  gsutil mb gs://${STAGING_BUCKET_NAME}
+  gsutil ls
+  
+  ## Creating Cloud Pub/Sub topics
+  export UPLOAD_NOTIFICATION_TOPIC=upload_notification
+  gcloud pubsub topics create ${UPLOAD_NOTIFICATION_TOPIC}
+  gcloud pubsub topics create visionapiservice
+  gcloud pubsub topics create videointelligenceservice
+  gcloud pubsub topics create bqinsert
+  gcloud pubsub topics list
+  
+  ## Creating Cloud Storage notifications
+  gsutil notification create -t upload_notification -f json -e OBJECT_FINALIZE gs://${IV_BUCKET_NAME}
+  gsutil notification list gs://${IV_BUCKET_NAME}
+  
+  ## Preparing the Cloud Functions for Deployment
+  gsutil -m cp -r gs://spls/gsp138/cloud-functions-intelligentcontent-nodejs .
+  cd cloud-functions-intelligentcontent-nodejs
+  
+  ## Create the BigQuery dataset and table
+  export DATASET_ID=intelligentcontentfilter
+  export TABLE_NAME=filtered_content
+  bq --project_id ${PROJECT_ID} mk ${DATASET_ID}
+  bq --project_id ${PROJECT_ID} mk --schema intelligent_content_bq_schema.json -t ${DATASET_ID}.${TABLE_NAME}
+  
+  ## Edit your JSON configuration file
+  sed -i "s/\[PROJECT-ID\]/$PROJECT_ID/g" config.json
+  sed -i "s/\[FLAGGED_BUCKET_NAME\]/$FLAGGED_BUCKET_NAME/g" config.json
+  sed -i "s/\[FILTERED_BUCKET_NAME\]/$FILTERED_BUCKET_NAME/g" config.json
+  sed -i "s/\[DATASET_ID\]/$DATASET_ID/g" config.json
+  sed -i "s/\[TABLE_NAME\]/$TABLE_NAME/g" config.json
+  cat config.json
+  ```
+
+- Deploying the Cloud Functions([inde.js source code](https://github.com/GoogleCloudPlatform/cloud-functions-intelligentcontent-nodejs/blob/master/index.js))
+
+  - `GCStoPubsub`: Receive a Cloud Storage notification message from Cloud Pub/Sub and forward the message to the appropriate function with another Cloud Pub/Sub message.
+  - `visionAPI`: Receive a message with Cloud Pub/Sub, call the **Vision API**, and forward the message to the `insertIntoBigQuery` Cloud Function with another Cloud Pub/Sub message.
+  - `videoIntelligenceAPI`: Receive a message with Cloud Pub/Sub, call the **Video Intelligence API**, and forward the message to the `insertIntoBigQuery` Cloud Function with another Cloud Pub/Sub message.
+  - `insertIntoBigQuery`: Receive a message with Cloud Pub/Sub and call the BigQuery API to insert the data into your BigQuery table.
+
+  ```sh
+  ## Deploy the GCStoPubsub function
+  gcloud functions deploy GCStoPubsub --runtime nodejs10 --stage-bucket gs://${STAGING_BUCKET_NAME} --trigger-topic ${UPLOAD_NOTIFICATION_TOPIC} --entry-point GCStoPubsub
+  
+  ## Deploy the visionAPI function
+  gcloud functions deploy visionAPI --runtime nodejs10 --stage-bucket gs://${STAGING_BUCKET_NAME} --trigger-topic visionapiservice --entry-point visionAPI
+  
+  ## Deploy the videoIntelligenceAPI function
+  gcloud functions deploy videoIntelligenceAPI --runtime nodejs10 --stage-bucket gs://${STAGING_BUCKET_NAME} --trigger-topic videointelligenceservice --entry-point videoIntelligenceAPI --timeout 540
+  
+  ## Deploy the insertIntoBigQuery function
+  gcloud functions deploy insertIntoBigQuery --runtime nodejs10 --stage-bucket gs://${STAGING_BUCKET_NAME} --trigger-topic bqinsert --entry-point insertIntoBigQuery
+  
+  ## check
+  gcloud functions list
+  ```
+
+- Testing the Flow
+
+  - **Notification** -> **GCPStoPubsub** -> **visionAPI**/**videoIntelligenceAPI** -> **insertIntoBigQuery**
+
+  - Upload an image and a video file to the upload storage bucket.
+
+    - **Navigation menu** > **Cloud Storage** > **Browser** > **XXXX-upload**
+
+    - Upload some image files and/or video files from your local machine.
+
+    - Monitor Log Activity:
+
+      ```sh
+      ## GCStoPubsub log
+      gcloud functions logs read --filter "finished with status" "GCStoPubsub" --limit 100
+      
+      ## You will also notice that your uploaded image has been moved to the next bucket as well
+      
+      ## insertIntoBigQuery log
+      gcloud functions logs read --filter "finished with status" "insertIntoBigQuery" --limit 100
+      ```
+
+    - View Results in BigQuery
+
+      ```sql
+      echo "
+      #standardSql
+      
+      SELECT insertTimestamp,
+        contentUrl,
+        flattenedSafeSearch.flaggedType,
+        flattenedSafeSearch.likelihood
+      FROM \`$PROJECT_ID.$DATASET_ID.$TABLE_NAME\`
+      CROSS JOIN UNNEST(safeSearch) AS flattenedSafeSearch
+      ORDER BY insertTimestamp DESC,
+        contentUrl,
+        flattenedSafeSearch.flaggedType
+      LIMIT 1000
+      " > sql.txt
+      
+      bq --project_id ${PROJECT_ID} query < sql.txt
+      ```
+
+      - The image was examined for four flags: adult, medical, spoof and violence
+      - If the image be flagged, it will move to the flagged bucket, as in the `download-2.jpg` table below
+
+      | Row  | insertTimestamp         | imgName        | flaggedType | likelihood    |
+      | ---- | ----------------------- | -------------- | ----------- | ------------- |
+      | 1    | 2021-07-25 10:08:27 UTC | download-2.jpg | adult       | VERY_UNLIKELY |
+      | 2    | 2021-07-25 10:08:27 UTC | download-2.jpg | medical     | UNLIKELY      |
+      | 3    | 2021-07-25 10:08:27 UTC | download-2.jpg | spoof       | POSSIBLE      |
+      | 4    | 2021-07-25 10:08:27 UTC | download-2.jpg | violence    | UNLIKELY      |
+      | 5    | 2021-07-25 10:04:04 UTC | download-1.jpg | adult       | VERY_UNLIKELY |
+      | 6    | 2021-07-25 10:04:04 UTC | download-1.jpg | medical     | VERY_UNLIKELY |
+      | 7    | 2021-07-25 10:04:04 UTC | download-1.jpg | spoof       | VERY_UNLIKELY |
+      | 8    | 2021-07-25 10:04:04 UTC | download-1.jpg | violence    | UNLIKELY      |
