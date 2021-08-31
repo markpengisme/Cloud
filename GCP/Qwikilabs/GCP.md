@@ -49,3 +49,8 @@
   - Creating an Object Detection Application Using TensorFlow
   - Using OpenTSDB to Monitor Time-Series Data on Cloud Platform
   - Scanning User-generated Content Using the Cloud Video Intelligence and Cloud Vision APIs
+- [Google Developer Essentials](./Google-Developer-Essentials.md)
+  - Weather Data in BigQuery
+  - Classify Images of Clouds in the Cloud with AutoML Vision
+  - Google Assistant: Build a Restaurant Locator with the Places API
+  - App Engine: Qwik Start - Python
