@@ -239,3 +239,106 @@
   | 1    | Noise - Street/Sidewalk: Loud Talking     | 109951                | 452        | -0.668     | -0.668   |
   | 2    | Noise - Vehicle: Car/Truck Music          | 78780                 | 449        | -0.644     | -0.644   |
   | 5    | Noise - Street/Sidewalk: Loud Music/Party | 192111                | 452        | -0.552     | -0.552   |
+
+## Classify Images of Clouds in the Cloud with AutoML Vision
+
+- **AutoML Vision** helps developers with limited ML expertise train high quality image recognition models via an easy to use REST API.
+
+- In this lab you will upload images to Cloud Storage and use them to train a custom model to recognize different three types of clouds(cirrus, cumulus, and cumulonimbus)
+
+- Set up AutoML Vision
+
+  -  **Navigation menu** > **APIs & Services** > **Library** > `Cloud AutoML` > **Enable**
+
+- Cloud Shell
+
+  ```sh
+  export PROJECT_ID=$DEVSHELL_PROJECT_ID
+  export QWIKLABS_USERNAME=$(whoami)@qwiklabs.net
+  export QWIKLABS_USERNAME=$(echo $QWIKLABS_USERNAME | sed -e "s/_/-/g")
+  
+  ## Add automl permission
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+      --member="user:$QWIKLABS_USERNAME" \
+      --role="roles/automl.admin"
+      
+  ## Create a bucket
+  gsutil mb -p $PROJECT_ID \
+      -c standard    \
+      -l us-central1 \
+      gs://$PROJECT_ID-vcm/
+  ```
+
+- Upload training images to Cloud Storage
+
+  ```sh
+  export BUCKET=$PROJECT_ID-vcm
+  
+  ## copy training data
+  gsutil -m cp -r gs://spls/gsp223/images/* gs://${BUCKET}
+  ```
+
+- Create a dataset
+
+  - You'll need a CSV file where each row contains a URL to a training image and the associated label for that image.
+
+  ```sh
+  ## downlaod csv
+  gsutil cp gs://spls/gsp223/data.csv .
+  
+  ## change bucket name
+  sed -i -e "s/placeholder/${BUCKET}/g" ./data.csv
+  head -5 data.csv
+  # gs://qwiklabs-gcp-03-xxxxxxxxxxxx-vcm/cirrus/1.jpg,cirrus
+  # gs://qwiklabs-gcp-03-xxxxxxxxxxxx-vcm/cirrus/10.jpg,cirrus
+  # gs://qwiklabs-gcp-03-xxxxxxxxxxxx-vcm/cirrus/11.jpg,cirrus
+  # gs://qwiklabs-gcp-03-xxxxxxxxxxxx-vcm/cirrus/12.jpg,cirrus
+  # gs://qwiklabs-gcp-03-xxxxxxxxxxxx-vcm/cirrus/13.jpg,cirrus
+  
+  ## upload to cloud storage bucket
+  gsutil cp ./data.csv gs://${BUCKET}
+  ```
+
+  -  **Navigation menu** > **Vision** > **Datasets** >  **+ NEW DATASET** > `clouds` > `Single-Label Classification` 
+  -  **Select a CSV file on Cloud Storage** > `gs://${BUCKET}/data.csv` > **Continue**
+
+- Inspect images
+  - **Images** tab 
+  - Review the training images
+  - Try filtering by different **labels** in the left menu to images.
+  - If any images are labeled incorrectly you can click on the image to switch the label.
+  - To see a summary of how many images you have for each label, click on **LABEL STATS** at the top of the page. (Train:Validation:Test = 8:1:1)
+
+- Train your model
+
+  - **Train** tab > **Start Training** > **Continue** > Set **8** node hours > **Start Training**
+  - Wait half an hour...
+  - Kill time with this [video](https://youtu.be/_2eG8xpRYZ4)
+
+- Evaluate your model
+
+  - Confidence threshold
+
+  - Precision: 83.33%
+
+  - Recall: 83.33%
+
+  - Confusion matrix: This table shows how often the model classified each label correctly and which labels were most often confused for that label.
+
+    | **N/A**          | **cumulus** | **cumulonimbus** | **cirrus** |
+    | ---------------- | ----------- | ---------------- | ---------- |
+    | **cumulus**      | 1           | 1                | 0          |
+    | **cumulonimbus** | 0           | 2                | 0          |
+    | **cirrus**       | 0           | 0                | 2          |
+
+- Deploy your model
+
+  -  **Test & Use** tab >  **Deploy model** > **Deploy**
+  - Wait 20 minutes.
+
+- Generate predictions
+
+  - Download the [image-1](https://cdn.qwiklabs.com/N2psyplM3kFK9NEjjpak3CPIhh8IurY7Tn9vqzi4r8M%3D), [image-2](https://cdn.qwiklabs.com/GZlBRmAKGzsDoT8yNRCh6VmxflxLEQEkiKPohYwja94%3D)
+  - Upload and view the predictions.
+  - image1: cirrus/0.9994734
+  - image2: cumulonimbus/0.9710835
