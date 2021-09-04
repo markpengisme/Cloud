@@ -342,3 +342,174 @@
   - Upload and view the predictions.
   - image1: cirrus/0.9994734
   - image2: cumulonimbus/0.9710835
+
+## Google Assistant: Build a Restaurant Locator with the Places API
+
+- In this lab you built a robust Google Assistant application with Dialogflow and Cloud Function.It takes in a user's current location and restaurant preferences to generate the ideal restaurant for them to visit, complete with names, addresses, and photos.
+
+- Create an Actions project
+  -  [Actions on Google Developer Console](http://console.actions.google.com/) > **New Project** > Choose the project > **Import project** > **Actions  Console** >  Click the Project
+
+- Build an Action
+
+  - **Build your action > Add Action(s) > Get Started** > **Custom Intent > BUILD** > Yes & Acceopt term of service >  **Create** (At dialogflow essentials page)
+  - **Fulfillment** tab> Enable Webhook > `https://google.com` > **Save**
+  
+- Build the Default Welcome Intent
+  
+  - **Intentst** tab > **Default Welcome Intent** > **Responses** section > Delete all of the default > **ADD RESPONSES** > **Text response** `Hello there and welcome to Restaurant Locator! What is your location? ` > **Save**
+    - [More example Ref.]([Design Walkthrough](https://developers.google.com/actions/design/walkthrough#write_dialogs))
+  
+- Build the Custom Intent
+
+  - Click **+** next to the intents tab
+  - Name: `get_restaurant`
+  - **Add Training Phrases**
+    - `345 Spear Street` 
+    - `1600 Amphitheatre Parkway, Mountain View`
+    - `20 W 34th St, New York, NY 10001`
+    - Add `@sys.location` Entity to above three phrases
+  - **Action and parameters**
+    - Check the **REQUIRED** checkbox for the `@sys.location` entity. This tells Dialogflow not to trigger the intent until the parameter is properly provided by the user.
+    - Click **Define prompts** for location (right-hand side) and provide a re-prompt phrase. `What is your address?`
+    - Click **+ New Parameter**
+      - **Required** - Select the checkbox
+      - **Parameter name** - proximity
+      - **Entity** - @sys.unit-length
+      - **Value** - $proximity
+      - **Prompts** - How far are you willing to travel?
+    - Click **+ New Parameter**
+      - **Required** - Select the checkbox
+      - **Parameter name** - cuisine
+      - **Entity** - @sys.any
+      - **Value** - $cuisine
+      - **Prompts** - What type of food or cuisine are you looking for?
+  - **Responses** 
+    - **+** > **Google Assistant**  > Toggle **Set this intent as end of conversation**
+  - **Fulfillment**
+    - **Enable fulfillment** > **Enable webhook call for this intent** 
+  - **SAVE**
+
+- Enable APIs and retrieve an API key
+
+  - **Navigation menu** >**APIs & Services** > **Library** > `Places API` > Enable
+  - **Navigation menu** >**APIs & Services** > **Library** > `Maps JavaScript API` > Enable
+  - **Navigation menu** >**APIs & Services** > **Library** > `Geocoding API` > Enable
+  - **APIs & Services** > **Credentials** >  **+ CREATE CREDENTIALS** > **API Key**
+  - Copy the API key and save it .(AIzaSyC_O4B3A4hKD11AY6BaFhEStJsCfwpz63E)
+
+- Initialize a Cloud Function
+
+  - **Navigation menu** > **Cloud Functions** >  **Create function**
+
+    - Function name: `restaurant_locator`
+    - Check **Allow unauthenticated invocations**
+    - **Save** > **Next**
+
+  - Entry point: `get_restaurant`
+
+  - index.js
+
+    - Replace `<YOUR_API_KEY_HERE>` (18)
+    - Replace `<YOUR_REGION>` to `tw`(26)
+
+    ```js
+    'use strict';
+    
+    const {
+      dialogflow,
+      Image,
+      Suggestions
+    } = require('actions-on-google');
+    
+    const functions = require('firebase-functions');
+    const app = dialogflow({debug: true});
+    
+    function getMeters(i) {
+         return i*1609.344;
+    }
+    
+    app.intent('get_restaurant', (conv, {location, proximity, cuisine}) => {
+          const axios = require('axios');
+          var api_key = "<YOUR_API_KEY_HERE>";
+          var user_location = JSON.stringify(location["street-address"]);
+          var user_proximity;
+          if (proximity.unit == "mi") {
+            user_proximity = JSON.stringify(getMeters(proximity.amount));
+          } else {
+            user_proximity = JSON.stringify(proximity.amount * 1000);
+          }
+          var geo_code = "https://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURIComponent(user_location) + "&region=<YOUR_REGION>&key=" + api_key;
+          return axios.get(geo_code)
+            .then(response => {
+              var places_information = response.data.results[0].geometry.location;
+              var place_latitude = JSON.stringify(places_information.lat);
+              var place_longitude = JSON.stringify(places_information.lng);
+              var coordinates = [place_latitude, place_longitude];
+              return coordinates;
+          }).then(coordinates => {
+            var lat = coordinates[0];
+            var long = coordinates[1];
+            var place_search = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=" + encodeURIComponent(cuisine) +"&inputtype=textquery&fields=photos,formatted_address,name,opening_hours,rating&locationbias=circle:" + user_proximity + "@" + lat + "," + long + "&key=" + api_key;
+            return axios.get(place_search)
+            .then(response => {
+                var photo_reference = response.data.candidates[0].photos[0].photo_reference;
+                var address = JSON.stringify(response.data.candidates[0].formatted_address);
+                var name = JSON.stringify(response.data.candidates[0].name);
+                var photo_request = 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=' + photo_reference + '&key=' + api_key;
+                conv.ask(`Fetching your request...`);
+                conv.ask(new Image({
+                    url: photo_request,
+                    alt: 'Restaurant photo',
+                  }))
+                conv.close(`Okay, the restaurant name is ` + name + ` and the address is ` + address + `. The following photo uploaded from a Google Places user might whet your appetite!`);
+            })
+        })
+    });
+    
+    exports.get_restaurant = functions.https.onRequest(app);
+    ```
+
+  - package.json
+
+    ```json
+    {
+      "name": "get_reviews",
+      "description": "Get restaurant reviews.",
+      "version": "0.0.1",
+      "author": "Google Inc.",
+      "engines": {
+        "node": "8"
+      },
+      "dependencies": {
+        "actions-on-google": "^2.0.0",
+        "firebase-admin": "^4.2.1",
+        "firebase-functions": "1.0.0",
+        "axios": "0.16.2"
+      }
+    }
+    ```
+
+  - Deploy
+
+  - After creation completes, click `restaurant_locator`  > **trigger** > Copy **Trigger URL**
+
+- Configure the webhook
+
+  - **Dialogflow console**  > **Fulfillment**
+    - URL:  Paste the **Trigger URL**
+    - **Save**
+
+- Change your Google permission settings
+
+  - Open [Activity Controls page](https://myaccount.google.com/activitycontrols)
+  - Turn on **Web & App Activity**
+
+- Test the application with the Actions simulator
+
+  - **Dialogflow console** > **Integrations** > **PREVIEW MIGRATION** >  **Test**
+  - The Actions simulator allows you to test your applications without any hardware.
+  - `Talk to my test app`
+  - `345 Spear Street San Francisco`
+  - `0.5 miles away`
+  - `Italian food`
