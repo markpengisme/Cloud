@@ -513,3 +513,56 @@
   - `345 Spear Street San Francisco`
   - `0.5 miles away`
   - `Italian food`
+
+## App Engine: Qwik Start - Python
+
+- The App Engine standard environment is based on container instances running on Google's infrastructure, and allows developers to focus on doing what they do best, writing code.
+
+- Features
+
+  - Persistent storage with queries, sorting, and transactions.
+  - Automatic scaling and load balancing.
+  - Asynchronous task queues for performing work outside the scope of a request.
+  - Scheduled tasks for triggering events at specified times or regular intervals.
+  - Integration with other Google cloud services and APIs.
+
+- Enable Google App Engine Admin API
+
+  - **Navigation menu** > **APIs & Services** > **Library** > `App Engine Admin API` > Enable
+
+- Download the Hello World app
+
+  ```sh
+  gsutil -m cp -r gs://spls/gsp067/python-docs-samples .
+  cd python-docs-samples/appengine/standard_python3/hello_world
+  ```
+
+- Test the application
+
+  - `dev_appserver.py app.yaml`(run in cloud shell)
+
+  - **Web preview** > **Preview on port 8080**
+
+- Make a change
+
+  ```sh
+  cd python-docs-samples/appengine/standard_python3/hello_world
+  vi main.py
+  ## Change "Hello World!" to "Hello, World!!!!!"
+  ```
+
+  - **Web Preview** > **Preview on port 8080**
+
+- Deploy your app
+
+  ```sh
+  gcloud app deploy
+  # [1] asia-east2 -> Y
+  ```
+
+- View your application
+
+  ```sh
+  gcloud app browse
+  ## Click on the link
+  ```
