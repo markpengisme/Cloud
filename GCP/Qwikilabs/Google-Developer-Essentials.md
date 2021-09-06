@@ -566,3 +566,7 @@
   gcloud app browse
   ## Click on the link
   ```
+
+## Autoscaling an Instance Group with Custom Cloud Monitoring Metrics
+
+[old note](./Google-Cloud-Solutions-Scaling-Your-Infrastructure.md#Autoscaling-an-Instance-Group-with-Custom-Cloud-Monitoring-Metrics)
