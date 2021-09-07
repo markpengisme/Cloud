@@ -54,3 +54,8 @@
   - Classify Images of Clouds in the Cloud with AutoML Vision
   - Google Assistant: Build a Restaurant Locator with the Places API
   - App Engine: Qwik Start - Python
+- [Build Apps & Websites with Firebase](./Build-Apps-and-Websites-with-Firebase.md)
+  - Importing Data to a Firestore Database
+  - Build a Serverless Web App with Firebase
+  - Deploy a Hugo Website with Cloud Build and Firebase Pipeline
+  - Google Assistant: Build an Application with Dialogflow and Cloud Functions
