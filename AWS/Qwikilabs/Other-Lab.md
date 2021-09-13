@@ -167,3 +167,67 @@
   - Manage access permissions on an object
   - Create a bucket policy
   - Use bucket versioning
+
+## Introduction to Amazon Relational Database Service (RDS) (Windows)
+
+- This lab introduces you to Amazon Relational Database Service(RDS) using the AWS Management Console.
+
+- Amazon Relational Database Service (Amazon RDS) is a web service that makes it easy to setup, operate, and scale relational databases in the cloud. (MySQL, PostGRE, Oracle, or SQL Server)
+
+- **Start Lab** > **Open Console**
+
+- Create a Relational Database Service (RDS) Instance
+
+  - **AWS Management Console** > **Services** > **RDS** > **Databases** > **Create database**
+    - **Engine options**
+      -  **MySQL**
+    - **Templates**
+      - **Dev/Test**
+    - **Settings**
+      - DB instance identifier: `my-rds`
+      - Master username: `student`
+      - Master password: `Pass.123`
+      - Confirm password: `Pass.123`
+    - **DB instance class**
+      - DB instance class: **Burstable classes (db.t3.micro)**
+    - **Availability & durability**
+      - Multi-AZ deployment: **Do not create a standby instance**
+    - **Connectivity**
+      - Virtual Private Cloud (VPC): **Lab VPC**
+      - Publicly accessible: **No**
+      - Existing VPC security groups:
+        - Select **RDS Security Group**
+        - Remove **default**
+    - **Additional configuration**
+      - Initial database name: `lab `
+      - De-select **Enable automatic backups**
+      - De-select **Enable Enhanced monitoring**
+      - De-select **Enable auto minor version upgrade**
+    - **Create database**
+
+- Log into Your EC2 Instance & Access Your Database
+
+  - **AWS Management Console** > **Services** > **RDS** > **Databases** > **my-rds** > **Connectivity & security** > Copy the **Endpoint**
+
+  - After you log into EC2 Instance (Connection information on the left panel of the lab.)
+
+  - Click **Windows Start** > `mysql` > Click **MySQL Workbench 6.3 CE**.
+
+    - Username: student
+    - Password: Pass.123
+
+  - **Query** > **New Tab to Current Server**
+
+    ```SQL
+    CREATE TABLE lab.staff (firstname text, lastname text, phone text);
+    
+    INSERT INTO lab.staff VALUES ("John", "Smith", "555-1234");
+    
+    INSERT INTO lab.staff VALUES ("Sarah", "Jones", "555-8866");
+    
+    SELECT * FROM lab.staff WHERE firstname = "Sarah";
+    ```
+
+  - **Execute**
+
+- **Sign Out **> **End Lab**  > **OK**
