@@ -267,3 +267,210 @@
     - CloudFront: New image
   - Since the cache was invalidated, refreshing the page caused Amazon CloudFront to pull the updated file from the origin (Amazon S3) and copied the new version to the cache.
 
+## Creating an Amazon Virtual Private Cloud (VPC) with AWS CloudFormation
+
+- This lab will demonstrate how to create an Amazon Virtual Private Cloud (VPC) network using AWS CloudFormation.
+
+- You will then launch the AWS CloudFormation template to create a four-subnet Amazon VPC that spans two Availability Zones and a NAT that allows servers in the private subnets to communicate with the Internet in order to download packages and updates.
+
+- **AWS CloudFormation** gives developers and systems administrators an easy way to create and manage a collection of related AWS resources, provisioning and updating them in an orderly and predictable fashion.
+
+- **Start lab** > **Open Console**
+
+- Deploy a Stack using AWS CloudFormation
+
+  - Download [file](https://s3.us-west-2.amazonaws.com/us-west-2-aws-training/awsu-spl/spl-15/4.1.9.prod/scripts/vpc-1.yaml)
+
+  - **AWS Management Console** > **Services** > **CloudFormation** > **Create stack** > **With new resources**
+
+    1. **Specify template**: **Upload a template file** >  **Choose file** > `vpc-1.yaml` > **Next**
+
+    2. **Specify stack detail**: Stack Name: `Lab` > **Next**
+
+    3. **Configure stack options**: **Next**
+
+    4. **Review Lab**: **Next**
+
+  - **Stack info** > Wait for Status:**CREATE_COMPLETE**
+
+  - **Resources** > Display the resources
+
+- Examine the VPC
+
+  - ![image-20210726063128243](/Users/pengshengmao/Library/Application Support/typora-user-images/image-20210726063128243.png)
+
+  - **Services** > **VPC** > **Filter by VPC** > Select **Lab VPC**> **Your VPCs** > Select **Lab VPC**
+
+    - A VPC is an isolated section of the AWS Cloud that allows resources to communicate with each other and, selectively, with the Internet. When deploying resources such as Amazon EC2 instances, you must select the VPC in which the instance will be launched.
+
+    - **Details** > **IPv4 CIDR** = 10.0.0.0/16(Have all 10.0.x.x IP)
+
+    ```yaml
+    ## vpc-1.yaml
+    Resources:
+      VPC:
+        Type: AWS::EC2::VPC
+        Properties:
+          CidrBlock: 10.0.0.0/16
+          EnableDnsHostnames: true
+          Tags:
+          - Key: Name
+            Value: Lab VPC
+    ```
+
+  - **VPC Management Console** > **Internet Gateways** >
+
+    - An **Internet gateway** is a horizontally scaled, redundant, and highly available VPC component that allows communication between instances in your VPC and the Internet. It, therefore, imposes no availability risks or bandwidth constraints on your network traffic. Purpose
+    - An Internet gateway serves two purposes: to provide a target in your VPC route tables for Internet-routable traffic and to perform network address translation (NAT) for instances that have been assigned public IPv4 addresses.
+
+    ```yaml
+    ## vpc-1.yaml
+    Resources:
+      #...
+      InternetGateway:
+        Type: AWS::EC2::InternetGateway
+        Properties:
+          Tags:
+          - Key: Name
+            Value: Lab Internet Gateway
+    ```
+
+    - A VPC Gateway Attachment creates a relationship between a VPC and a gateway, such as this Internet Gateway.
+
+    ```yaml
+    ## vpc-1.yaml
+    Resources:
+      #...
+      AttachGateway:
+        Type: AWS::EC2::VPCGatewayAttachment
+        Properties:
+          VpcId: !Ref VPC
+          InternetGatewayId: !Ref InternetGatewa
+    ```
+
+  - **VPC Management Console** > **Subnets**
+
+    - **Public Subnet 1** is connected to the Internet,  using the **Internet Gateway**(Let resources in this subnet be publicly accessible)
+    - **Private Subnet 1** is *not* connected to the Internet.(More secure for resources in this subnet)
+    - Properties: VpcId/CidrBlock/AvailabilityZone
+
+    ```yaml
+    ## vpc-1.yaml
+    Resources:
+      #...
+      PublicSubnet1:
+        Type: AWS::EC2::Subnet
+        Properties:
+          VpcId: !Ref VPC
+          CidrBlock: 10.0.0.0/24
+          AvailabilityZone: !Select
+            - '0'
+            - !GetAZs ''
+          Tags:
+            - Key: Name
+              Value: Public Subnet 1
+    
+      PrivateSubnet1:
+        Type: AWS::EC2::Subnet
+        Properties:
+          VpcId: !Ref VPC
+          CidrBlock: 10.0.1.0/24
+          AvailabilityZone: !Select
+            - '0'
+            - !GetAZs ''
+          Tags:
+            - Key: Name
+              Value: Private Subnet 1
+    ```
+
+  - **VPC Management Console** > **Route Table** > Select **Public Route Table** > **Routes**
+
+    - For traffic within the VPC (10.0.0.0/16), route the traffic locally.
+    - For traffic going to the Internet (0.0.0.0/0), route the traffic to the Internet Gateway.
+
+    ```yaml
+    ## vpc-1.yaml
+    Resources:
+      #...
+      PublicRouteTable:
+        Type: AWS::EC2::RouteTable
+        Properties:
+          VpcId: !Ref VPC
+          Tags:
+            - Key: Name
+              Value: Public Route Table
+      PublicRoute:
+        Type: AWS::EC2::Route
+        Properties:
+          RouteTableId: !Ref PublicRouteTable
+          DestinationCidrBlock: 0.0.0.0/0
+          GatewayId: !Ref InternetGateway
+    ```
+
+    - **Private Route Table** is similar to Public Route Table, but only Public Route Table have **PublicRoute** which is what makes it public.
+
+    - **Subnet associations** > Show Public Route Table is associated with **Public Subnet 1**
+
+      - A Route Table can be associated with multiple subnets, with each association requiring an explicit linkage, as the following  code:
+
+      ```yaml
+      ## vpc-1.yaml
+      Resources:
+        #...
+        PublicSubnetRouteTableAssociation1:
+          Type: AWS::EC2::SubnetRouteTableAssociation
+          Properties:
+            SubnetId: !Ref PublicSubnet1
+            RouteTableId: !Ref PublicRouteTable
+      ```
+
+  - **Services** > **CloudFormation** > **Lab** > **Outputs**
+
+    - Show the CloudFormation template has been configured to return information about the resources it created:
+    - **VPC** is the ID of the VPC that was created.
+    - **AZ1** shows the Availability Zone in which the Subnets were created.
+
+    ```yaml
+    Outputs:
+      VPC:
+        Description: VPC
+        Value: !Ref VPC
+    
+      AZ1:
+        Description: Availability Zone 1
+        Value: !GetAtt
+          - PublicSubnet1
+          - AvailabilityZone
+    ```
+
+- Updating a Stack
+
+  - Update the stack to two public subnets and two private subnets with the template for high availability.
+
+    ![img](https://s3.us-west-2.amazonaws.com/us-west-2-aws-training/awsu-spl/spl-15/4.1.9.prod/images/vpc-2.png)
+
+  - Download the [file](https://s3.us-west-2.amazonaws.com/us-west-2-aws-training/awsu-spl/spl-15/4.1.9.prod/scripts/vpc-2.yaml)
+
+  - Select **Lab** > **Update** > Select **Replace current template** > Select **Upload a template file** > Click **Choose file** > `vpc-2.yaml` > **Next** > **Next** > **Next** > Look at the **Change set preview**, there are 2 subnets and 2 route table associations > **Update stack**
+
+  - **Stack info** > Wait for the status change to**UPDATE_COMPLETE**
+
+  - **Outputs** > Additional AZ2 is added and has a different value to AZ1
+
+  - **Services** > **VPC** > **Filter by VPC** > Select **Lab VPC**> **Subnet** > There are 4 subnets.
+
+- Viewing a Stack in CloudFormation Designer
+
+  - **AWS CloudFormation Designer** is a graphic tool for creating, viewing, and modifying AWS CloudFormation templates.
+  - **Services** > **CloudFormation** > Click **Lab** stack > **Template** tab > **View in Designer**
+  - Examine the diagram
+    - Use the Zoom controls and drag the image.
+    - Arrows show the relationship between resources.
+    - Click the **Components** tab at the bottom and click on some elements in the diagram. It will show the code that defines the resources.(YAML/JSON)
+
+- Delete the Stack
+  - Click the **Close** at the top-left of the page to **Leave Page**.
+  - Click the **Lab** stack > **Delete** >  **Delete stack** >  **Events**: wait for all status change to **DELETE_COMPLETE**
+  - **Services** > **VPC** > **Your VPCs** > The **Lab VPC** is no longer present.
+
+- **End lab** > **OK**
