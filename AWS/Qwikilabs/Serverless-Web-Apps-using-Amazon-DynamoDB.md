@@ -319,3 +319,337 @@
   - Click on one of the log streams to see log events.
 
 - **Sign Out** > **End Lab**> **OK**
+
+## Serverless Web Apps using Amazon DynamoDB(3 parts)
+
+- This is a three-part lab which teaches you how to create a serverless web app with an Amazon DynamoDB backend data store.
+- In this first part of the lab, you will build the infrastructure you will need in subsequent labs. You will create a DynamoDB table and add data, then build the necessary IAM roles and polices.
+- In this second part of the lab, you will build upon the infrastructure created in part one. You will go on to create Lambda functions that interact with the DynamoDB table and add data, then build the necessary IAM roles and polices to support access to the functions and database via API Gateway.
+- In this third part of the lab, you will configure an API using Amazon API Gateway and set up a public website to retrieve information from your DynamoDB table via Lambda functions.
+
+### Part1
+
+- **Start Lab**>  **Open Console**
+
+- Create your DynamoDB Table
+
+  - **Services** > **DynamoDB** > Create table
+    - Table name: `SuperMission`
+    - Primary key:`SuperHero` **String**
+    - **Create**
+
+- Add item via Tree method
+
+  - **Items** tab > **Create item** > **Tree**
+
+    | Field                                 | Type   | Value       |
+    | ------------------------------------- | ------ | ----------- |
+    | SuperHero (already populated for you) | String | Batman      |
+    | MissionStatus                         | String | In progress |
+    | Villain1                              | String | Joker       |
+    | Villain2                              | String | Bane        |
+    | Villain3                              | String | Ras Al Ghul |
+    | SecretIdentity                        | String | Bruce Wayne |
+
+  - **Save**
+
+- Add Items via JSON
+
+  - **Create item** > **Text**
+
+    ```json
+    {
+        "SuperHero": "Superman",
+        "Villain1": "Doomsday",
+        "Villain2": "General Zod",
+        "Villain3": "Lex Luthor",
+        "MissionStatus": "In progress",
+        "SecretIdentity": "Clark Kent"
+    }
+    ```
+
+    ```json
+    {
+        "SuperHero": "The Winchester Brothers",
+        "Villain1": "Vampires",
+        "Villain2": "Ghosts",
+        "Villain3": "Werewolves",
+        "MissionStatus": "Complete",
+        "SecretIdentity": "Sam and Dean"
+    }
+    ```
+
+    ```json
+    {
+        "SuperHero": "Iron Man",
+        "Villain1": "Apocalypse",
+        "Villain2": "Doctor Doom",
+        "Villain3": "Loki",
+        "MissionStatus": "In progress",
+        "SecretIdentity": "Tony Stark"
+    }
+    ```
+
+- Review IAM policies and Roles
+
+  - **Services** > **IAM**> **Roles** > **SuperDynamoDBScanRole** > Expand **SuperDynamoDBScanRole** > **{}JSON**> **The policy will look similar to:**
+
+    ```json
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": [
+                    "dynamodb:Scan",
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "dynamodb:BatchWriteItem"
+                ],
+                "Resource": [
+                    "*"
+                ],
+                "Effect": "Allow"
+            }
+        ]
+    }
+    ```
+
+  - **Services** > **IAM**> **Roles** > **SuperDynamoDBQueryPolicy** > Expand **SuperDynamoDBQueryPolicy** > **{}JSON**> **The policy will look similar to:**
+
+    > Condition can implement column-level security
+
+    ```json
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Condition": {
+                    "ForAllValues:StringEquals": {
+                        "dynamodb:Attributes": [
+                            "SuperHero",
+                            "MissionStatus",
+                            "Villain1",
+                            "Villain2",
+                            "Villain3"
+                        ]
+                    }
+                },
+                "Action": [
+                    "dynamodb:Query"
+                ],
+                "Resource": "*",
+                "Effect": "Allow"
+            }
+        ]
+    }
+    ```
+
+- **Sign Out** > **End Lab**> **OK**
+
+### Part2
+
+- **Start Lab**>  **Open Console**
+
+- Check CloudFormation Status
+
+  - **AWS Management Console** > **Services** > **CloudFormation** (Oregon region)
+    - Wait for the stack change to **CREATE_COMPLETE**
+
+- Create Your First Lambda Functions
+
+  - **Services** > **Lambda** > **Create function** > **Author from scratch**
+
+    - Function name: `getheroeslist`
+    - Runtime:  **Node.js 12.x**
+    - Execution role: **Use an existing role**
+    - Existing role:  **SuperDynamoDBScanRole**
+    - **Create function**
+
+  - **Code tab** > Paste the code below into `index.js`( Retrieves a list of super heroes that stored in the **SuperMission** DynamoDB table.)  > **Deploy**
+
+    ```js
+    var doc = require('aws-sdk');
+    var dynamo = new doc.DynamoDB();
+    
+    exports.handler = function(event, context) {
+        var getParams = {
+            TableName:'SuperMission'
+       };
+    
+        dynamo.scan(getParams, function(err, data){
+            if (err) console.log(err, err.stack); // an error occurred
+            else {
+                 context.succeed(data);
+            }
+        });
+    };
+    ```
+
+  - **Test** tab
+
+    - Name: `myTest`
+    - code: `{}`
+    - **Save changes**
+    - **Test** > Execution result: succeeded  > **Details** > Will display the contents of **SuperMission** table.
+
+- Create Your Second Lambda Functions
+
+  - **Services** > **Lambda** > **Create function** > **Author from scratch**
+
+    - Function name: `getmissiondetails`
+    - Runtime:  **Node.js 12.x**
+    - Execution role: **Use an existing role**
+    - Existing role:  ***SuperDynamoDBQueryRole***
+    - **Create function**
+
+  - **Code tab** > Paste the code below into `index.js` (Retrieves the mission details from the **SuperMission** DynamoDB table.)  > **Deploy**
+
+    ```js
+    var doc = require('aws-sdk');
+    var dynamo = new doc.DynamoDB();
+    
+    exports.handler = function(event, context) {
+        var condition = {};
+        condition["SuperHero"] = {
+                    ComparisonOperator: 'EQ',
+                    AttributeValueList:[{S: event.superhero}]
+                }
+    
+        var getParams = {
+            TableName:'SuperMission',
+            ProjectionExpression:"SuperHero, MissionStatus, Villain1, Villain2, Villain3",
+            KeyConditions: condition
+       };
+    
+        dynamo.query(getParams, function(err, data){
+            if (err) console.log(err, err.stack); // an error occurred
+            else {
+                 context.succeed(data);
+            }
+        });
+    };
+    ```
+
+  - **Test** tab
+    - Name: `myTest2`
+    - code: `{"superhero": "Batman"}`
+    - **Save changes**
+    - **Test** > Execution result: succeeded  > **Details** > Will display the  the mission details for Batman.
+
+- **Sign Out** > **End Lab**> **OK**
+
+### Part3
+
+- Verify Resources
+
+  - **AWS Management Console** > **Services** > **CloudFormation** (Oregon region)
+    - Wait for the stack change to **CREATE_COMPLETE**
+  - Verify Your DynamoDB Table
+    - **Services** > **DynamoDB** > **Tables** > SuperMission: Active
+  - Verify Your Lambda Functions
+    - **Services** > **Lambda** > **getheroeslist** & **getmissiondetails** exist.
+  - Verify Your IAM Policies and Roles
+    - **Services** > **IAM** > **Roles** > **SuperDynamoDBScanRole** & **SuperDynamoDBQueryRole** exist and they are attached
+
+- Create and Deploy an API
+
+  - Create Your API
+
+    - **Services** > **API Gateway** > **Build(REST API)** >
+      - protocol:**REST**
+      - **New API**
+      - API name: `SuperheroesMission`
+      - Description: `Demo`
+      - **Create API**
+
+  - Create Resources
+
+    - Click `/` > **Actions** > **Create Resource**
+      - Resource Name: `getheroeslist`
+      - **Create Resource**
+    - Click `/` > **Actions** > **Create Resource**
+      - Resource Name: `getmissiondetails`
+      - **Create Resource**
+
+  - Create Method
+
+    - Click **getheroeslist** > **Actions** > **Create Method** > **POST**
+      - Integration type: **Lambda Function**
+      - Lambda Region: **us-west-2**
+      - Lambda Function: `getheroeslist`
+      - Click **Save** > **OK**
+    - Click **getmissiondetails** > **Actions** > **Create Method** > **POST**
+      - Integration type: **Lambda Function**
+      - Lambda Region: **us-west-2**
+      - Lambda Function: `getmissiondetails`
+      - Click **Save** > **OK**
+
+  - Enable CORS
+
+    - Click **getmissiondetails** > **Actions** > **Enable CORS**
+      - **Post**, **Option**
+      - **Enable CORS and replace existing CORS headers**
+      - **Yes, replace existing values**
+
+    - Click **getmissiondetails** > **Actions** > **Enable CORS**
+      - **Post**, **Option**
+      - **Enable CORS and replace existing CORS headers**
+      - **Yes, replace existing values**
+    - Click root folder `/` > **Actions** > **Deploy API**
+      - Deployment stage: **New Stage**
+      - Stage name: `Demo1`
+      - Click **Deploy**
+
+- Generate the SDK For Your API
+
+  - On the stage editor > **SDK Generation** tab
+    - Platform: **Javascript**
+    - Click **Generate SDK**
+    - Get zip file > unzip > Get `apiGateway-js-sdk` folder
+    - Download and add this [index.html](https://s3.us-west-2.amazonaws.com/us-west-2-aws-training/awsu-spl/spl-134/2.1.9.prod/scripts/index.html) to folder
+    - Opn `index.html`
+    - Using the index web page, retrieve mission details.
+    - Review the output.
+  - The drop-down list uses the API Gateway resource **getheroeslist** to invoke the **getheroeslistFunction** Lambda function.
+  - the API Gateway resources **getmissiondetails** and Lambda functions are invoked to return results for **Mission Status** and **Mission Dossier**.
+
+- Publish With S3
+
+  - **Services** > **S3** > **Create bucket**
+
+    - Bucket name: `mybucket-xxxxxx`
+    - Region: US West (Oregon) us-west-2
+    - De-select **Block all public access**
+    - Select **I acknowledge that ...**.
+    - **Create bucket**
+
+  - Click bucket `mybucket-xxxxxx`  > **Permissions** > **Edit(Bucket policy)** > Paste bucket policy below > **Save changes**
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "PublicReadForGetBucketObjects",
+          "Effect": "Allow",
+          "Principal": "*",
+          "Action": "s3:GetObject",
+          "Resource": "arn:aws:s3:::mybucket-xxxxxx/*"
+        }
+      ]
+    }
+    ```
+
+  - **Properties** > **Edit(**Static website hosting**)**
+
+    - **Enable**
+    - Hosting Type : **Host a static website**
+    - Index document: `index.html`
+    - Error document: `index.html`
+    - **Save changes**
+
+  - **Objects** > **Upload** > **Add folder** > Choose `apiGateway-js-sdk` > **Upload**
+  - Wait until the upload is complete.
+  - Open a new window to this URL `http://mybucket-xxxxxx.s3-website-us-west-2.amazonaws.com/apiGateway-js-sdk/index.html`(**Static website hosting**)
+  - You can now look up mission dossier data stored in your DynamoDB database.
+  - `S3(Serverless WebAPP)  <--> API Gateway <--> Lambda functions <-- DynamoDB`
