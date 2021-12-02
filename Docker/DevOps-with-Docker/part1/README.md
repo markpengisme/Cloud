@@ -7,3 +7,12 @@ CONTAINER ID   IMAGE     COMMAND                  CREATED              STATUS   
 fcbb7434f81a   nginx     "/docker-entrypoint.…"   About a minute ago   Up About a minute          80/tcp    infallible_mestorf
 ```
 
+# 1.2: Cleanup
+
+```
+MarkPeng:DevOps-with-Docker/ (main✗) $ docker ps                                                        
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+MarkPeng:DevOps-with-Docker/ (main✗) $ docker images                                                    
+REPOSITORY   TAG       IMAGE ID   CREATED   SIZE
+```
+
