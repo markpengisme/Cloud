@@ -16,3 +16,13 @@ MarkPeng:DevOps-with-Docker/ (main✗) $ docker images
 REPOSITORY   TAG       IMAGE ID   CREATED   SIZE
 ```
 
+# 1.3: Secret message
+
+```
+MarkPeng:DevOps-with-Docker/ (main✗) $ docker run -d --name secret devopsdockeruh/simple-web-service:ubuntu
+43d2dd6f7f080c19c1eadbfa263449a88964c457a841d4b60a6ef6173c878d42
+MarkPeng:DevOps-with-Docker/ (main✗) $ docker exec -it secret sh -c "tail -f ./text.log"                        
+
+Secret message is: 'You can find the source code here: https://github.com/docker-hy'
+```
+
