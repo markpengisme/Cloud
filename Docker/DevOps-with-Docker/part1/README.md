@@ -33,3 +33,15 @@ docker run -d -it --rm --name read-website ubuntu sh -c 'apt update; apt install
 docker attach read-website
 ```
 
+# 1.5: Sizes of images
+
+```sh
+docker pull devopsdockeruh/simple-web-service:ubuntu
+docker pull devopsdockeruh/simple-web-service:alpine
+
+MarkPeng:DevOps-with-Docker/ (main✗) $ docker images devopsdockeruh/simple-web-service                          
+REPOSITORY                          TAG       IMAGE ID       CREATED        SIZE
+devopsdockeruh/simple-web-service   ubuntu    4e3362e907d5   8 months ago   83MB
+devopsdockeruh/simple-web-service   alpine    fd312adc88e0   8 months ago   15.7MB
+```
+
