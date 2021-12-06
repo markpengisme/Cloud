@@ -45,3 +45,13 @@ devopsdockeruh/simple-web-service   ubuntu    4e3362e907d5   8 months ago   83MB
 devopsdockeruh/simple-web-service   alpine    fd312adc88e0   8 months ago   15.7MB
 ```
 
+# 1.6: Hello Docker Hub
+
+```sh
+docker run -it devopsdockeruh/pull_exercise
+
+Give me the password: basics
+You found the correct password. Secret message is:
+"This is the secret message"
+```
+
