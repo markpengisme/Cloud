@@ -55,3 +55,15 @@ You found the correct password. Secret message is:
 "This is the secret message"
 ```
 
+# 1.7: Two line Dockerfile
+
+```dockerfile
+FROM devopsdockeruh/simple-web-service:alpine
+CMD ["server"]
+```
+
+```sh
+docker build . -t web-server
+docker run web-server
+```
+
