@@ -67,3 +67,30 @@ docker build . -t web-server
 docker run web-server
 ```
 
+# 1.8: Image for script
+
+```sh
+## start.sh
+#!/bin/sh
+echo "Input website:";
+read website;
+echo "Searching..";
+sleep 1;
+curl http://$website;
+```
+
+```
+FROM ubuntu:18.04 
+
+WORKDIR /mydir 
+RUN apt-get update && apt-get install -y curl
+COPY start.sh ./start.sh
+CMD ["/bin/bash","start.sh"]
+```
+
+```sh
+docker build . -t curler
+docker run -it curler
+helsinki.fi
+```
+
