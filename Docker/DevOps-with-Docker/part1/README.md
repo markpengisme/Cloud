@@ -94,3 +94,10 @@ docker run -it curler
 helsinki.fi
 ```
 
+# 1.9: Volumes
+
+```sh
+touch /tmp/text.log
+docker run -v /tmp/text.log:/usr/src/app/text.log devopsdockeruh/simple-web-service
+```
+
