@@ -101,3 +101,9 @@ touch /tmp/text.log
 docker run -v /tmp/text.log:/usr/src/app/text.log devopsdockeruh/simple-web-service
 ```
 
+# 1.10: Ports open
+
+```sh
+docker run -p 80:8080 devopsdockeruh/simple-web-service -c "server"
+```
+
