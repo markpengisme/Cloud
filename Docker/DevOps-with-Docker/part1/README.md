@@ -107,3 +107,25 @@ docker run -v /tmp/text.log:/usr/src/app/text.log devopsdockeruh/simple-web-serv
 docker run -p 80:8080 devopsdockeruh/simple-web-service -c "server"
 ```
 
+# 1.11: Spring
+
+```dockerfile
+FROM openjdk:8
+
+WORKDIR /usr/src/app
+
+RUN apt update && \
+    apt install -y git
+  
+RUN git clone https://github.com/docker-hy/material-applications.git
+RUN cd material-applications/spring-example-project && ./mvnw package
+
+EXPOSE 8080
+CMD ["/usr/local/openjdk-8/bin/java", "-jar", "/usr/src/app/material-applications/spring-example-project/target/docker-example-1.1.3.jar"]
+```
+
+```sh
+docker build -t simple-button .
+docker run -p 80:8080 simple-button
+```
+
