@@ -129,3 +129,30 @@ docker build -t simple-button .
 docker run -p 80:8080 simple-button
 ```
 
+# 1.12: Hello, frontend!
+
+```dockerfile
+FROM node:fermium-alpine
+
+WORKDIR /usr/src/app
+
+RUN apk update && \
+    apk add git && \
+    git clone https://github.com/docker-hy/material-applications.git && \
+    mv material-applications/example-frontend/* ./ &&\
+    rm -rf material-applications
+RUN npm install && node -v && npm -v && \
+		npm run build && \
+		npm install -g serve
+		
+EXPOSE 5000		
+
+CMD serve -s -l 5000 build
+```
+
+```
+docker build -t example-frontend .
+docker run -d -p 5000:5000 example-frontend
+```
+
+http://0.0.0.0:5000
