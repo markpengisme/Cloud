@@ -155,21 +155,22 @@ docker build -t example-frontend .
 docker run -d -p 5000:5000 example-frontend
 ```
 
-http://0.0.0.0:5000
+http://localhost:5000
 
 # 1.13: Hello, backend!
 
 ```dockerfile
 FROM golang:1.16-alpine
+
 WORKDIR /usr/src/app
 
 RUN apk update && \
     apk add git build-base && \
     git clone https://github.com/docker-hy/material-applications.git && \
-    mv material-applications/example-backend/cd * ./ &&\
+    mv material-applications/example-backend/* ./ && \
     rm -rf material-applications
-RUN go build && \
-		go test ./... && \
+RUN go build
+RUN go test ./...
 
 EXPOSE 8080
 
