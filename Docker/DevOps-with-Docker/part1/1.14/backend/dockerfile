@@ -1,0 +1,17 @@
+FROM golang:1.16-alpine
+
+WORKDIR /usr/src/app
+
+RUN apk update && \
+    apk add git build-base && \
+    git clone https://github.com/docker-hy/material-applications.git && \
+    mv material-applications/example-backend/* ./ && \
+    rm -rf material-applications
+
+ENV REQUEST_ORIGIN http://localhost:5000
+RUN go build
+RUN go test ./...
+
+EXPOSE 8080
+
+CMD ./server

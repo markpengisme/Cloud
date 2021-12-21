@@ -183,3 +183,57 @@ docker run -d -p 8080:8080 example-backend
 ```
 
  http://localhost:8080/ping
+
+# 1.14: Environment
+
+```dockerfile
+# frontend
+FROM node:fermium-alpine
+
+WORKDIR /usr/src/app
+
+RUN apk update && \
+    apk add git && \
+    git clone https://github.com/docker-hy/material-applications.git && \
+    mv material-applications/example-frontend/* ./ &&\
+    rm -rf material-applications
+
+ENV REACT_APP_BACKEND_URL=http://localhost:8080/
+RUN npm install && node -v && npm -v && \
+		npm run build && \
+		npm install -g serve
+
+EXPOSE 5000
+
+CMD serve -s -l 5000 build
+```
+
+```dockerfile
+# backend
+FROM golang:1.16-alpine
+
+WORKDIR /usr/src/app
+
+RUN apk update && \
+    apk add git build-base && \
+    git clone https://github.com/docker-hy/material-applications.git && \
+    mv material-applications/example-backend/* ./ && \
+    rm -rf material-applications
+
+ENV REQUEST_ORIGIN http://localhost:5000
+RUN go build
+RUN go test ./...
+
+EXPOSE 8080
+
+CMD ./server
+```
+
+```sh
+docker build ./frontend -t example-frontend
+docker build ./backend -t example-backend
+docker run -d -p 8080:8080 example-backend
+docker run -d -p 5000:5000 example-frontend
+```
+
+http://localhost:5000
