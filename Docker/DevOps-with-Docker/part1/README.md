@@ -150,9 +150,35 @@ EXPOSE 5000
 CMD serve -s -l 5000 build
 ```
 
-```
+```sh
 docker build -t example-frontend .
 docker run -d -p 5000:5000 example-frontend
 ```
 
 http://0.0.0.0:5000
+
+# 1.13: Hello, backend!
+
+```dockerfile
+FROM golang:1.16-alpine
+WORKDIR /usr/src/app
+
+RUN apk update && \
+    apk add git build-base && \
+    git clone https://github.com/docker-hy/material-applications.git && \
+    mv material-applications/example-backend/cd * ./ &&\
+    rm -rf material-applications
+RUN go build && \
+		go test ./... && \
+
+EXPOSE 8080
+
+CMD ./server
+```
+
+```sh
+docker build -t example-backend .
+docker run -d -p 8080:8080 example-backend
+```
+
+ http://localhost:8080/ping
