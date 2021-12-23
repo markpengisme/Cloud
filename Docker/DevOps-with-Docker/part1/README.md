@@ -237,3 +237,32 @@ docker run -d -p 5000:5000 example-frontend
 ```
 
 http://localhost:5000
+
+# 1.15: Homework
+
+```dockerfile
+FROM ubuntu:20.04
+
+WORKDIR /usr/src/app
+
+COPY app /usr/src/app
+
+RUN apt update
+RUN DEBIAN_FRONTEND=noninteractive apt install -y protobuf-compiler python3-pil python3-lxml python3-pip
+RUN pip3 install --upgrade pip
+RUN pip3 install -r requirements.txt
+
+CMD ./main.py
+```
+
+```
+docker build . -t tensorflow-object-detection-example
+docker tag tensorflow-object-detection-example markpengisme/tensorflow-object-detection-example:1.0.0
+docker push markpengisme/tensorflow-object-detection-example:1.0.0
+```
+
+```
+docker run -d -p 80:80 markpengisme/tensorflow-object-detection-example:1.0.0
+```
+
+Open <http://0.0.0.0> > Choose File > Upload
