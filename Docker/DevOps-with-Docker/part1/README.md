@@ -266,3 +266,14 @@ docker run -d -p 80:80 markpengisme/tensorflow-object-detection-example:1.0.0
 ```
 
 Open <http://0.0.0.0> > Choose File > Upload
+
+# 1.16: Heroku
+
+```sh
+docker tag devopsdockeruh/heroku-example registry.heroku.com/dev-ops-with-docker-1-16/web
+docker push registry.heroku.com/dev-ops-with-docker-1-16/web
+heroku container:release web --app dev-ops-with-docker-1-16
+```
+
+https://dev-ops-with-docker-1-16.herokuapp.com
+
