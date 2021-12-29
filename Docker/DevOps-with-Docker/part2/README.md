@@ -35,3 +35,21 @@ docker-compose run simple-web-service
   ```
 
   http://0.0.0.0
+
+# 2.3
+
+```yaml
+version: '3'  
+
+services: 
+    frontend:
+        image: example-frontend
+        ports: 
+            - 5000:5000
+    backend: 
+        image: example-backend
+        ports: 
+            - 8080:8080
+```
+
+http://0.0.0.0:8080/ping
