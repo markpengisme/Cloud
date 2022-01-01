@@ -52,4 +52,29 @@ services:
             - 8080:8080
 ```
 
-http://0.0.0.0:8080/ping
+http://localhost:5000
+
+# 2.4
+
+![img](https://docker-hy.github.io/images/exercises/back-front-and-redis.png)
+
+```yaml
+version: '3'  
+
+services: 
+    frontend:
+        image: example-frontend
+        ports: 
+            - 5000:5000
+    backend: 
+        image: example-backend
+        environment:
+            - REDIS_HOST=cache
+            - REDIS_PORT=6379
+        ports: 
+            - 8080:8080
+    cache:
+        image: redis
+```
+
+http://localhost:5000
