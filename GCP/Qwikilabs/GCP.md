@@ -59,3 +59,21 @@
   - Build a Serverless Web App with Firebase
   - Deploy a Hugo Website with Cloud Build and Firebase Pipeline
   - Google Assistant: Build an Application with Dialogflow and Cloud Functions
+- [Deploy to Kubernetes in Google Cloud](./Deploy-to-Kubernetes-in-Google-Cloud.md)
+  - Introduction to Docker
+- [DevOps Essentials](./DevOps-Essentials.md)
+  - Cloud Source Repositories: Qwik Start
+  - Managing Deployments Using Kubernetes Engine
+  - Deploy Kubernetes Load Balancer Service with Terraform
+  - Troubleshooting Workloads on GKE for Site Reliability Engineers
+  - Continuous Delivery with Jenkins in Kubernetes Engine
+- [Automating Infrastructure on Google Cloud with Terraform](./Automating-Infrastructure-on-Google-Cloud-with-Terraform.md)
+  - Terraform Fundamentals
+  - Infrastructure as Code with Terraform
+  - Interact with Terraform Modules
+  - Managing Terraform State
+
+- [Cloud Architecture](./Cloud-Architecture.md)
+  - Orchestrating the Cloud with Kubernetes
+  - Multiple VPC Networks
+  - Troubleshooting Workloads on GKE for Site Reliability Engineers

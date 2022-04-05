@@ -318,13 +318,11 @@
 - Set up a global static external IP address
 
   ```sh
-  gcloud compute addresses create lb-ipv4-1 \
-      --ip-version=IPV4 \
-      --globalgcloud compute addresses describe lb-ipv4-1 \
+  gcloud compute addresses describe lb-ipv4-1 \
       --format="get(address)" \
       --global
   ```
-
+  
 - Create a healthcheck for the load balancer
 
   ```sh
